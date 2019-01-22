@@ -49,11 +49,22 @@ func (e *executor) execute(command string) {
 }
 
 func connect(args []string, connection *net.Conn) {
-	fmt.Println("connect()", args)
+	connectionType := args[0]
+	connectTo := args[1]
+	var err error
+	*connection, err = net.Dial(connectionType, connectTo)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 }
 
 func disconnect(args []string, connection *net.Conn) {
-	fmt.Println("disconnect()", args)
+	if *connection == nil {
+		return
+	}
+	(*connection).Close()
+	*connection = nil
 }
 
 func start(args []string, connection *net.Conn) {
