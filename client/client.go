@@ -8,77 +8,103 @@ import (
 	"strings"
 )
 
-type serverCall struct {
-	call   func([]string)
+type clientAction struct {
+	call   func([]string, *net.Conn)
 	argCnt int
 }
 
-var requests = map[string]serverCall{
-	"connect":    {connect, 1},
-	"disconnect": {disconnect, 0},
-	"start":      {start, 2},
-	"kill":       {kill, 1},
-	"unlock":     {unlock, 1},
-	"save":       {save, 2},
-	"pause":      {pause, 1},
-	"resume":     {resume, 1},
+type executor struct {
+	actions    map[string]clientAction
+	connection net.Conn
 }
 
-func connect(args []string) {
-	fmt.Println("connect()", args)
+func NewExecutor(actions map[string]clientAction) *executor {
+	var e executor
+	e.actions = actions
+	e.connection = nil
+	return &e
 }
 
-func disconnect(args []string) {
-	fmt.Println("disconnect()", args)
+func (e *executor) closer() {
+	disconnect([]string{}, &e.connection)
 }
 
-func start(args []string) {
-	fmt.Println("start()", args)
-}
-
-func kill(args []string) {
-	fmt.Println("kill()", args)
-}
-
-func unlock(args []string) {
-	fmt.Println("unlock()", args)
-}
-
-func save(args []string) {
-	fmt.Println("save()", args)
-}
-
-func pause(args []string) {
-	fmt.Println("pause()", args)
-}
-
-func resume(args []string) {
-	fmt.Println("resume()", args)
-}
-
-func executor(command string) {
+func (e *executor) execute(command string) {
 	commandSplit := strings.Split(command, " ")
 	commandName := commandSplit[0]
 	commandArgs := commandSplit[1:]
 
-	request, ok := requests[commandName]
+	action, ok := e.actions[commandName]
 	if !ok {
 		fmt.Println(commandName, "is not a valid operation")
 		return
 	}
-	if len(commandArgs) != request.argCnt {
+	if len(commandArgs) != action.argCnt {
 		fmt.Println("wrong number of arguments for", commandName)
 		return
 	}
-	request.call(commandArgs)
+	action.call(commandArgs, &e.connection)
+}
+
+func connect(args []string, connection *net.Conn) {
+	fmt.Println("connect()", args)
+}
+
+func disconnect(args []string, connection *net.Conn) {
+	fmt.Println("disconnect()", args)
+}
+
+func start(args []string, connection *net.Conn) {
+	fmt.Println("start()", args)
+}
+
+func kill(args []string, connection *net.Conn) {
+	fmt.Println("kill()", args)
+}
+
+func unlock(args []string, connection *net.Conn) {
+	fmt.Println("unlock()", args)
+}
+
+func save(args []string, connection *net.Conn) {
+	fmt.Println("save()", args)
+}
+
+func pause(args []string, connection *net.Conn) {
+	fmt.Println("pause()", args)
+}
+
+func resume(args []string, connection *net.Conn) {
+	fmt.Println("resume()", args)
+}
+
+func exit(args []string, connection *net.Conn) {
+	disconnect([]string{}, connection)
+	os.Exit(0)
 }
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println(err)
-		return
+	var actions = map[string]clientAction{
+		"connect":    {connect, 2},
+		"disconnect": {disconnect, 0},
+		"start":      {start, 2},
+		"kill":       {kill, 1},
+		"unlock":     {unlock, 1},
+		"save":       {save, 2},
+		"pause":      {pause, 1},
+		"resume":     {resume, 1},
+		"exit":       {exit, 0},
 	}
-	executor(strings.TrimSuffix(input, "\n"))
+	executor := NewExecutor(actions)
+	defer executor.closer()
+	for {
+		reader := bufio.NewReader(os.Stdin)
+		input, err := reader.ReadString('\n')
+		fmt.Println(input)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		executor.execute(strings.TrimSuffix(input, "\n"))
+	}
 }
