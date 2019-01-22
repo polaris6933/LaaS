@@ -15,18 +15,18 @@ type clientAction struct {
 
 type executor struct {
 	actions    map[string]clientAction
-	connection net.Conn
+	connection *net.Conn
 }
 
 func NewExecutor(actions map[string]clientAction) *executor {
 	var e executor
 	e.actions = actions
-	e.connection = nil
+	e.connection = new(net.Conn)
 	return &e
 }
 
 func (e *executor) closer() {
-	disconnect([]string{}, &e.connection)
+	disconnect([]string{}, e.connection)
 }
 
 func (e *executor) execute(command string) {
@@ -43,7 +43,9 @@ func (e *executor) execute(command string) {
 		fmt.Println("wrong number of arguments for", commandName)
 		return
 	}
-	action.call(commandArgs, &e.connection)
+	fmt.Println("connection value before call:", *e.connection)
+	action.call(commandArgs, e.connection)
+	fmt.Println("connection value after call:", *e.connection)
 }
 
 func connect(args []string, connection *net.Conn) {
@@ -100,7 +102,6 @@ func main() {
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		input, err := reader.ReadString('\n')
-		fmt.Println(input)
 		if err != nil {
 			fmt.Println(err)
 			return
