@@ -4,9 +4,11 @@ import (
 	"LaaS/executor"
 	"bufio"
 	"fmt"
+	"golang.org/x/crypto/ssh/terminal"
 	"net"
 	"os"
 	"strings"
+	"syscall"
 )
 
 func connect(args []string, connection *net.Conn) {
@@ -67,6 +69,31 @@ func send(args []string, connection *net.Conn) {
 func exit(args []string, connection *net.Conn) {
 	disconnect([]string{}, connection)
 	os.Exit(0)
+}
+
+func passwordConfirmation() string {
+	var firstAttempt, secondAttempt string
+	for {
+		firstAttempt = readPassword("input password: ")
+		secondAttempt = readPassword("confirm password: ")
+		if firstAttempt == secondAttempt {
+			break
+		}
+		fmt.Println("passwords do not match, try again")
+	}
+	return firstAttempt
+}
+
+func readPassword(prompt string) string {
+	// TODO: add windows support
+	fmt.Print(prompt)
+	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		fmt.Println(err)
+	}
+	password := string(bytePassword)
+	fmt.Println()
+	return password
 }
 
 func main() {
