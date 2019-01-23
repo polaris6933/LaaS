@@ -30,7 +30,14 @@ func disconnect(args []string, connection *net.Conn) {
 }
 
 func start(args []string, connection *net.Conn) {
-	fmt.Println("start()", args)
+	if *connection == nil {
+		fmt.Println("not connected to server atm")
+		return
+	}
+
+	name := args[0]
+	password := passwordConfirmation()
+	fmt.Fprintf(*connection, "add "+name+" "+password+"\n")
 }
 
 func kill(args []string, connection *net.Conn) {
@@ -66,7 +73,7 @@ func main() {
 	var actions = map[string]executor.Action{
 		"connect":    {connect, 2},
 		"disconnect": {disconnect, 0},
-		"start":      {start, 2},
+		"start":      {start, 1},
 		"kill":       {kill, 1},
 		"unlock":     {unlock, 1},
 		"save":       {save, 2},
