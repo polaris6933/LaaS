@@ -1,52 +1,13 @@
 package main
 
 import (
+	"LaaS/executor"
 	"bufio"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 )
-
-type clientAction struct {
-	call   func([]string, *net.Conn)
-	argCnt int
-}
-
-type executor struct {
-	actions    map[string]clientAction
-	connection *net.Conn
-}
-
-func NewExecutor(actions map[string]clientAction) *executor {
-	var e executor
-	e.actions = actions
-	e.connection = new(net.Conn)
-	return &e
-}
-
-func (e *executor) closer() {
-	disconnect([]string{}, e.connection)
-}
-
-func (e *executor) execute(command string) {
-	commandSplit := strings.Split(command, " ")
-	commandName := commandSplit[0]
-	commandArgs := commandSplit[1:]
-
-	action, ok := e.actions[commandName]
-	if !ok {
-		fmt.Println(commandName, "is not a valid operation")
-		return
-	}
-	if len(commandArgs) != action.argCnt {
-		fmt.Println("wrong number of arguments for", commandName)
-		return
-	}
-	fmt.Println("connection value before call:", *e.connection)
-	action.call(commandArgs, e.connection)
-	fmt.Println("connection value after call:", *e.connection)
-}
 
 func connect(args []string, connection *net.Conn) {
 	connectionType := args[0]
@@ -97,7 +58,7 @@ func exit(args []string, connection *net.Conn) {
 }
 
 func main() {
-	var actions = map[string]clientAction{
+	var actions = map[string]executor.Action{
 		"connect":    {connect, 2},
 		"disconnect": {disconnect, 0},
 		"start":      {start, 2},
@@ -107,9 +68,10 @@ func main() {
 		"pause":      {pause, 1},
 		"resume":     {resume, 1},
 		"exit":       {exit, 0},
+		"send":       {send, 1},
 	}
-	executor := NewExecutor(actions)
-	defer executor.closer()
+	executor := executor.NewExecutor(actions)
+	defer disconnect([]string{}, executor.Connection)
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		input, err := reader.ReadString('\n')
@@ -117,6 +79,6 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		executor.execute(strings.TrimSuffix(input, "\n"))
+		executor.Execute(strings.TrimSuffix(input, "\n"))
 	}
 }
