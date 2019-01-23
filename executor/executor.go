@@ -23,10 +23,10 @@ func NewExecutor(actions map[string]Action) *Executor {
 	return &e
 }
 
-func (e *Executor) Execute(action string) {
-	actionSplit := strings.Split(action, " ")
-	actionName := actionSplit[0]
-	actionArgs := actionSplit[1:]
+func (e *Executor) Execute(command string) {
+	commandSplit := strings.Split(command, " ")
+	actionName := commandSplit[0]
+	actionArgs := commandSplit[1:]
 
 	action, ok := e.actions[actionName]
 	if !ok {
