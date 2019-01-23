@@ -52,6 +52,10 @@ func resume(args []string, connection *net.Conn) {
 	fmt.Println("resume()", args)
 }
 
+func send(args []string, connection *net.Conn) {
+	fmt.Fprintf(*connection, strings.Join(args, " ")+"\n")
+}
+
 func exit(args []string, connection *net.Conn) {
 	disconnect([]string{}, connection)
 	os.Exit(0)
