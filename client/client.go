@@ -12,6 +12,7 @@ import (
 func connect(args []string, connection *net.Conn) {
 	connectionType := args[0]
 	connectTo := args[1]
+	disconnect([]string{}, connection)
 	var err error
 	*connection, err = net.Dial(connectionType, connectTo)
 	if err != nil {
