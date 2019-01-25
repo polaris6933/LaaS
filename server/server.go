@@ -11,14 +11,12 @@ import (
 	"time"
 )
 
-var sessions []*session
-
 const timeFormat string = "Mon Jan 2 2006 15:04"
 
 type session struct {
-	name                  string
-	created               time.Time
-	passwordHash          [sha256.Size]byte
+	name         string
+	created      time.Time
+	passwordHash [sha256.Size]byte
 }
 
 func NewSession(name string, password string) *session {
@@ -29,6 +27,20 @@ func NewSession(name string, password string) *session {
 	return s
 }
 
+type Server struct {
+	sessions   []*session
+	connection *net.Conn
+}
+
+func NewServer() *Server {
+	s := new(Server)
+	s.sessions = []*session{}
+	s.connection = nil
+	return s
+}
+
+func (s *Server) AssertExecutable() {}
+
 func (s *session) getStringRepresentation() string {
 	return "session " + s.name + ", created at " + s.created.Format(timeFormat)
 }
@@ -37,27 +49,24 @@ func (s *session) String() string {
 	return fmt.Sprintf(s.getStringRepresentation())
 }
 
-func add(args []string, connection *net.Conn) {
-	name := args[0]
-	pass := args[1]
-	for _, session := range sessions {
+func (s *Server) Add(name, pass string) {
+	for _, session := range s.sessions {
 		if session.name == name {
-			(*connection).Write(
+			(*s.connection).Write(
 				[]byte("session with the name " + name + "already exists"))
 			return
 		}
 	}
-	sessions = append(sessions, NewSession(name, pass))
-	fmt.Println((*connection).RemoteAddr().String(), "created session", name)
+	s.sessions = append(s.sessions, NewSession(name, pass))
+	fmt.Println((*s.connection).RemoteAddr().String(), "created session", name)
 }
 
-func remove(args []string, conection *net.Conn) {
-	name := args[0]
-	for idx, session := range sessions {
+func (s *Server) Remove(name string) {
+	for idx, session := range s.sessions {
 		if session.name == name {
-			last := len(sessions) - 1
-			sessions[idx] = sessions[last]
-			sessions = sessions[:last]
+			last := len(s.sessions) - 1
+			s.sessions[idx] = s.sessions[last]
+			s.sessions = s.sessions[:last]
 			return
 		}
 	}
@@ -76,15 +85,15 @@ func export(args []string, conection *net.Conn) {
 	fmt.Println("export()", args)
 }
 
-func list(args []string, connection *net.Conn) {
-	for _, session := range sessions {
-		(*connection).Write([]byte(session.getStringRepresentation()))
+func (s *Server) list() {
+	for _, session := range s.sessions {
+		fmt.Println(session.getStringRepresentation())
 	}
-	fmt.Println(len(sessions), "total\n")
+	fmt.Println(len(s.sessions), "total\n")
 }
 
-func handleRequest(e *executor.Executor) {
-	c := *e.Connection
+func (s *Server) handleRequest() {
+	c := *s.connection
 	fmt.Println("serving", c.RemoteAddr().String())
 	for {
 		received, err := bufio.NewReader(c).ReadString('\n')
@@ -93,7 +102,8 @@ func handleRequest(e *executor.Executor) {
 			return
 		}
 		request := strings.TrimSpace(string(received))
-		e.Execute(request)
+		executor.Execute(s, request)
+		s.list()
 	}
 }
 
@@ -113,18 +123,7 @@ func main() {
 	}
 	defer l.Close()
 
-	var actions = map[string]executor.Action{
-		"add":          {add, 2},
-		"remove":       {remove, 1},
-		"pause":        {pause, 1},
-		"resume":       {resume, 1},
-		"export":       {export, 2},
-		"list":         {list, 0},
-		"authenticate": {authenticate, 1},
-	}
-
-	sessions = []*session{}
-	executor := executor.NewExecutor(actions)
+	s := NewServer()
 
 	for {
 		c, err := l.Accept()
@@ -133,7 +132,7 @@ func main() {
 			return
 		}
 		defer c.Close()
-		executor.Connection = &c
-		go handleRequest(executor)
+		s.connection = &c
+		go s.handleRequest()
 	}
 }

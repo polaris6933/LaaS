@@ -11,35 +11,52 @@ import (
 	"syscall"
 )
 
-func connect(args []string, connection *net.Conn) {
-	connectionType := args[0]
-	connectTo := args[1]
-	disconnect([]string{}, connection)
-	var err error
-	*connection, err = net.Dial(connectionType, connectTo)
+type Client struct {
+	connection *net.Conn
+}
+
+func NewClient() *Client {
+	c := new(Client)
+	c.connection = nil
+	return c
+}
+
+func (c Client) AssertExecutable() {}
+
+func (c *Client) Connect(connectionType, connectTo string) {
+	c.Disconnect()
+	conn, err := net.Dial(connectionType, connectTo)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	c.connection = &conn
 }
 
-func disconnect(args []string, connection *net.Conn) {
-	if *connection == nil {
+func (c *Client) Disconnect() {
+	if c.connection == nil {
 		return
 	}
-	(*connection).Close()
-	*connection = nil
+	(*c.connection).Close()
+	c.connection = nil
 }
 
-func start(args []string, connection *net.Conn) {
-	if *connection == nil {
+func (c *Client) Start(name string) {
+	if c.connection == nil {
 		fmt.Println("not connected to server atm")
 		return
 	}
 
-	name := args[0]
 	password := passwordConfirmation()
-	fmt.Fprintf(*connection, "add "+name+" "+password+"\n")
+	fmt.Fprintf(*c.connection, "add "+name+" "+password+"\n")
+}
+
+func (c *Client) List() {
+	if c.connection == nil {
+		fmt.Println("not connected to server atm")
+		return
+	}
+	fmt.Fprintf(*c.connection, "list")
 }
 
 func kill(args []string, connection *net.Conn) {
@@ -62,12 +79,8 @@ func resume(args []string, connection *net.Conn) {
 	fmt.Println("resume()", args)
 }
 
-func send(args []string, connection *net.Conn) {
-	fmt.Fprintf(*connection, strings.Join(args, " ")+"\n")
-}
-
-func exit(args []string, connection *net.Conn) {
-	disconnect([]string{}, connection)
+func (c *Client) Exit() {
+	c.Disconnect()
 	os.Exit(0)
 }
 
@@ -97,20 +110,8 @@ func readPassword(prompt string) string {
 }
 
 func main() {
-	var actions = map[string]executor.Action{
-		"connect":    {connect, 2},
-		"disconnect": {disconnect, 0},
-		"start":      {start, 1},
-		"kill":       {kill, 1},
-		"unlock":     {unlock, 1},
-		"save":       {save, 2},
-		"pause":      {pause, 1},
-		"resume":     {resume, 1},
-		"exit":       {exit, 0},
-		"send":       {send, 1},
-	}
-	executor := executor.NewExecutor(actions)
-	defer disconnect([]string{}, executor.Connection)
+	client := NewClient()
+	defer client.Disconnect()
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		input, err := reader.ReadString('\n')
@@ -118,6 +119,6 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		executor.Execute(strings.TrimSuffix(input, "\n"))
+		executor.Execute(client, strings.TrimSuffix(input, "\n"))
 	}
 }

@@ -2,40 +2,37 @@ package executor
 
 import (
 	"fmt"
-	"net"
+	"reflect"
 	"strings"
 )
 
-type Action struct {
-	Call   func([]string, *net.Conn)
-	ArgCnt int
+type Executable interface {
+	AssertExecutable()
 }
 
-type Executor struct {
-	actions    map[string]Action
-	Connection *net.Conn
-}
-
-func NewExecutor(actions map[string]Action) *Executor {
-	var e Executor
-	e.actions = actions
-	e.Connection = new(net.Conn)
-	return &e
-}
-
-func (e *Executor) Execute(command string) {
+func Execute(anyType Executable, command string) {
 	commandSplit := strings.Split(command, " ")
-	actionName := commandSplit[0]
-	actionArgs := commandSplit[1:]
+	commandName := commandSplit[0]
+	commandArgs := commandSplit[1:]
 
-	action, ok := e.actions[actionName]
-	if !ok {
-		fmt.Println(actionName, "is not a valid action")
+	method := reflect.ValueOf(anyType).MethodByName(strings.Title(commandName))
+	if !method.IsValid() {
+		fmt.Println(commandName, "is not a valid action")
 		return
 	}
-	if len(actionArgs) != action.ArgCnt {
-		fmt.Println("wrong number of arguments for", actionName)
+	expectedArgsCnt := method.Type().NumIn()
+	givenArgsCnt := len(commandArgs)
+	if givenArgsCnt != expectedArgsCnt {
+		fmt.Printf(
+			"wrong number of arguments passed to %s, expected %d, got %d\n",
+			commandName, expectedArgsCnt, givenArgsCnt)
 		return
 	}
-	action.Call(actionArgs, e.Connection)
+
+	methodArgs := make([]reflect.Value, givenArgsCnt)
+	for idx, _ := range commandArgs {
+		methodArgs[idx] = reflect.ValueOf(commandArgs[idx])
+	}
+
+	method.Call(methodArgs)
 }
