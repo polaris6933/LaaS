@@ -23,10 +23,16 @@ func NewClient() *Client {
 
 func (c Client) AssertExecutable() {}
 
-func (c *Client) makeRequest(requestArgs []string) {
+func (c *Client) makeRequest(requestArgs []string) string {
+	if c.connection == nil {
+		return "not connected to server atm"
+	}
+
 	request := strings.Join(requestArgs, " ")
 	request = request + "\000"
 	fmt.Fprintf(*c.connection, request)
+
+	return c.WaitResponse()
 }
 
 func (c *Client) WaitResponse() string {
@@ -60,22 +66,12 @@ func (c *Client) Disconnect() string {
 }
 
 func (c *Client) Start(name string) string {
-	if c.connection == nil {
-		return "not connected to server atm"
-	}
-
 	password := passwordConfirmation()
-	c.makeRequest([]string{"add", name, password})
-	return c.WaitResponse()
+	return c.makeRequest([]string{"add", name, password})
 }
 
 func (c *Client) List() string {
-	if c.connection == nil {
-		fmt.Println("not connected to server atm")
-		return ""
-	}
-	c.makeRequest([]string{"list"})
-	return c.WaitResponse()
+	return c.makeRequest([]string{"list"})
 }
 
 func kill(args []string, connection *net.Conn) {
