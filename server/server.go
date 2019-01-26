@@ -12,7 +12,8 @@ import (
 	"time"
 )
 
-const timeFormat string = "Mon Jan 2 2006 15:04"
+const connectionType = "tcp"
+const timeFormat = "Mon Jan 2 2006 15:04"
 
 type session struct {
 	name         string
@@ -118,13 +119,12 @@ func (s *Server) handleRequest(connection *net.Conn) {
 
 func main() {
 	args := os.Args
-	if len(args) != 3 {
+	if len(args) != 2 {
 		fmt.Println("argument error")
 		return
 	}
 
-	connectionType := args[1]
-	port := ":" + args[2]
+	port := ":" + args[1]
 	l, err := net.Listen(connectionType, port)
 	if err != nil {
 		fmt.Println(err)

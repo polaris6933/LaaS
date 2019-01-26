@@ -11,6 +11,8 @@ import (
 	"syscall"
 )
 
+const connectionType = "tcp"
+
 type Client struct {
 	connection *net.Conn
 }
@@ -44,7 +46,7 @@ func (c *Client) WaitResponse() string {
 	return response
 }
 
-func (c *Client) Connect(connectionType, connectTo string) string {
+func (c *Client) Connect(connectTo string) string {
 	c.Disconnect()
 	conn, err := net.Dial(connectionType, connectTo)
 	if err != nil {
