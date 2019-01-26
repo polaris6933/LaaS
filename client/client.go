@@ -23,32 +23,44 @@ func NewClient() *Client {
 
 func (c Client) AssertExecutable() {}
 
-func (c *Client) Connect(connectionType, connectTo string) {
+func (c *Client) WaitResponse() string {
+	response, err := bufio.NewReader(*c.connection).ReadString('\n')
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+	return strings.TrimSuffix(response, "\n")
+}
+
+func (c *Client) Connect(connectionType, connectTo string) string {
 	c.Disconnect()
 	conn, err := net.Dial(connectionType, connectTo)
 	if err != nil {
 		fmt.Println(err)
-		return
+		return ""
 	}
 	c.connection = &conn
+	return "connected to " + (*c.connection).RemoteAddr().String()
 }
 
-func (c *Client) Disconnect() {
+func (c *Client) Disconnect() string {
 	if c.connection == nil {
-		return
+		return ""
 	}
+	address := (*c.connection).RemoteAddr().String()
 	(*c.connection).Close()
 	c.connection = nil
+	return "disconnected from " + address
 }
 
-func (c *Client) Start(name string) {
+func (c *Client) Start(name string) string {
 	if c.connection == nil {
-		fmt.Println("not connected to server atm")
-		return
+		return "not connected to server atm"
 	}
 
 	password := passwordConfirmation()
 	fmt.Fprintf(*c.connection, "add "+name+" "+password+"\n")
+	return c.WaitResponse()
 }
 
 func (c *Client) List() {
@@ -111,6 +123,7 @@ func readPassword(prompt string) string {
 
 func main() {
 	client := NewClient()
+	var response string
 	defer client.Disconnect()
 	for {
 		reader := bufio.NewReader(os.Stdin)
@@ -119,6 +132,14 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		executor.Execute(client, strings.TrimSuffix(input, "\n"))
+		execResult, err := executor.Execute(
+			client, strings.TrimSuffix(input, "\n"))
+		if err != nil {
+			fmt.Println(err)
+			continue
+		} else {
+			response = execResult[0].Interface().(string)
+		}
+		fmt.Println(response)
 	}
 }

@@ -28,14 +28,12 @@ func NewSession(name string, password string) *session {
 }
 
 type Server struct {
-	sessions   []*session
-	connection *net.Conn
+	sessions []*session
 }
 
 func NewServer() *Server {
 	s := new(Server)
 	s.sessions = []*session{}
-	s.connection = nil
 	return s
 }
 
@@ -49,28 +47,26 @@ func (s *session) String() string {
 	return fmt.Sprintf(s.getStringRepresentation())
 }
 
-func (s *Server) Add(name, pass string) {
+func (s *Server) Add(name, pass string) string {
 	for _, session := range s.sessions {
 		if session.name == name {
-			(*s.connection).Write(
-				[]byte("session with the name " + name + "already exists"))
-			return
+			return "session with the name " + name + " already exists"
 		}
 	}
 	s.sessions = append(s.sessions, NewSession(name, pass))
-	fmt.Println((*s.connection).RemoteAddr().String(), "created session", name)
+	return "created session " + name
 }
 
-func (s *Server) Remove(name string) {
+func (s *Server) Remove(name string) string {
 	for idx, session := range s.sessions {
 		if session.name == name {
 			last := len(s.sessions) - 1
 			s.sessions[idx] = s.sessions[last]
 			s.sessions = s.sessions[:last]
-			return
+			return "removed session " + name
 		}
 	}
-	fmt.Println("no session with the name", name, "found")
+	return "no session with the name" + name + "found"
 }
 
 func pause(args []string, conection *net.Conn) {
@@ -92,18 +88,26 @@ func (s *Server) list() {
 	fmt.Println(len(s.sessions), "total\n")
 }
 
-func (s *Server) handleRequest() {
-	c := *s.connection
-	fmt.Println("serving", c.RemoteAddr().String())
+func (s *Server) handleRequest(connection *net.Conn) {
+	connectionAddress := (*connection).RemoteAddr().String()
+	fmt.Println("serving", connectionAddress)
 	for {
-		received, err := bufio.NewReader(c).ReadString('\n')
+		received, err := bufio.NewReader(*connection).ReadString('\n')
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 		request := strings.TrimSpace(string(received))
-		executor.Execute(s, request)
-		s.list()
+		execResult, err := executor.Execute(s, request)
+		var response string
+		if err != nil {
+			fmt.Println(err)
+			response = "internal server error"
+		} else {
+			response = execResult[0].Interface().(string)
+		}
+		(*connection).Write([]byte(response + "\n"))
+		fmt.Println(connectionAddress, "-", response)
 	}
 }
 
@@ -132,7 +136,6 @@ func main() {
 			return
 		}
 		defer c.Close()
-		s.connection = &c
-		go s.handleRequest()
+		go s.handleRequest(&c)
 	}
 }
