@@ -24,12 +24,12 @@ func NewClient() *Client {
 func (c Client) AssertExecutable() {}
 
 func (c *Client) WaitResponse() string {
-	response, err := bufio.NewReader(*c.connection).ReadString('\n')
+	response, err := bufio.NewReader(*c.connection).ReadString('\000')
 	if err != nil {
 		fmt.Println(err)
 		return ""
 	}
-	return strings.TrimSuffix(response, "\n")
+	return response
 }
 
 func (c *Client) Connect(connectionType, connectTo string) string {
@@ -63,12 +63,13 @@ func (c *Client) Start(name string) string {
 	return c.WaitResponse()
 }
 
-func (c *Client) List() {
+func (c *Client) List() string {
 	if c.connection == nil {
 		fmt.Println("not connected to server atm")
-		return
+		return ""
 	}
-	fmt.Fprintf(*c.connection, "list")
+	fmt.Fprintf(*c.connection, "list\n")
+	return c.WaitResponse()
 }
 
 func kill(args []string, connection *net.Conn) {
@@ -111,6 +112,7 @@ func passwordConfirmation() string {
 
 func readPassword(prompt string) string {
 	// TODO: add windows support
+	// TODO: empty password should not be allowed
 	fmt.Print(prompt)
 	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
 	if err != nil {

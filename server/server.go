@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	// "strconv"
 	"strings"
 	"time"
 )
@@ -81,16 +82,19 @@ func export(args []string, conection *net.Conn) {
 	fmt.Println("export()", args)
 }
 
-func (s *Server) list() {
+func (s *Server) List() string {
+	var listing strings.Builder
 	for _, session := range s.sessions {
-		fmt.Println(session.getStringRepresentation())
+		listing.WriteString(session.getStringRepresentation())
 	}
-	fmt.Println(len(s.sessions), "total\n")
+	listing.WriteString(fmt.Sprintf("\n%d total", len(s.sessions)))
+	return listing.String()
 }
 
 func (s *Server) handleRequest(connection *net.Conn) {
 	connectionAddress := (*connection).RemoteAddr().String()
 	fmt.Println("serving", connectionAddress)
+	var response string
 	for {
 		received, err := bufio.NewReader(*connection).ReadString('\n')
 		if err != nil {
@@ -99,14 +103,13 @@ func (s *Server) handleRequest(connection *net.Conn) {
 		}
 		request := strings.TrimSpace(string(received))
 		execResult, err := executor.Execute(s, request)
-		var response string
 		if err != nil {
 			fmt.Println(err)
 			response = "internal server error"
 		} else {
 			response = execResult[0].Interface().(string)
 		}
-		(*connection).Write([]byte(response + "\n"))
+		(*connection).Write([]byte(response + "\000"))
 		fmt.Println(connectionAddress, "-", response)
 	}
 }
