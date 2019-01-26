@@ -74,8 +74,8 @@ func (c *Client) List() string {
 	return c.makeRequest([]string{"list"})
 }
 
-func kill(args []string, connection *net.Conn) {
-	fmt.Println("kill()", args)
+func (c *Client) Kill(name string) string {
+	return c.makeRequest([]string{"remove", name})
 }
 
 func unlock(args []string, connection *net.Conn) {

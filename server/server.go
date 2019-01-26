@@ -86,6 +86,7 @@ func (s *Server) List() string {
 	var listing strings.Builder
 	for _, session := range s.sessions {
 		listing.WriteString(session.getStringRepresentation())
+		listing.WriteString("\n")
 	}
 	listing.WriteString(fmt.Sprintf("\n%d total", len(s.sessions)))
 	return listing.String()
