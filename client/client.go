@@ -23,6 +23,12 @@ func NewClient() *Client {
 
 func (c Client) AssertExecutable() {}
 
+func (c *Client) makeRequest(requestArgs []string) {
+	request := strings.Join(requestArgs, " ")
+	request = request + "\000"
+	fmt.Fprintf(*c.connection, request)
+}
+
 func (c *Client) WaitResponse() string {
 	response, err := bufio.NewReader(*c.connection).ReadString('\000')
 	if err != nil {
@@ -59,7 +65,7 @@ func (c *Client) Start(name string) string {
 	}
 
 	password := passwordConfirmation()
-	fmt.Fprintf(*c.connection, "add "+name+" "+password+"\n")
+	c.makeRequest([]string{"add", name, password})
 	return c.WaitResponse()
 }
 
@@ -68,7 +74,7 @@ func (c *Client) List() string {
 		fmt.Println("not connected to server atm")
 		return ""
 	}
-	fmt.Fprintf(*c.connection, "list\n")
+	c.makeRequest([]string{"list"})
 	return c.WaitResponse()
 }
 

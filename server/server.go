@@ -96,12 +96,13 @@ func (s *Server) handleRequest(connection *net.Conn) {
 	fmt.Println("serving", connectionAddress)
 	var response string
 	for {
-		received, err := bufio.NewReader(*connection).ReadString('\n')
+		received, err := bufio.NewReader(*connection).ReadString('\000')
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		request := strings.TrimSpace(string(received))
+		request := strings.TrimRight(string(received), "\000")
+		fmt.Println(len(request))
 		execResult, err := executor.Execute(s, request)
 		if err != nil {
 			fmt.Println(err)
