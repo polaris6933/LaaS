@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -10,23 +11,24 @@ type Executable interface {
 	AssertExecutable()
 }
 
-func Execute(anyType Executable, command string) {
+func Execute(anyType Executable, command string) ([]reflect.Value, error) {
 	commandSplit := strings.Split(command, " ")
 	commandName := commandSplit[0]
 	commandArgs := commandSplit[1:]
 
 	method := reflect.ValueOf(anyType).MethodByName(strings.Title(commandName))
 	if !method.IsValid() {
-		fmt.Println(commandName, "is not a valid action")
-		return
+		errorMessage := commandName + " is not a valid action"
+		return []reflect.Value{},
+			errors.New(errorMessage)
 	}
 	expectedArgsCnt := method.Type().NumIn()
 	givenArgsCnt := len(commandArgs)
 	if givenArgsCnt != expectedArgsCnt {
-		fmt.Printf(
-			"wrong number of arguments passed to %s, expected %d, got %d\n",
+		errorMessage := fmt.Sprintf(
+			"wrong number of arguments passed to %s, expected %d, got %d",
 			commandName, expectedArgsCnt, givenArgsCnt)
-		return
+		return []reflect.Value{}, errors.New(errorMessage)
 	}
 
 	methodArgs := make([]reflect.Value, givenArgsCnt)
@@ -34,5 +36,5 @@ func Execute(anyType Executable, command string) {
 		methodArgs[idx] = reflect.ValueOf(commandArgs[idx])
 	}
 
-	method.Call(methodArgs)
+	return method.Call(methodArgs), nil
 }
