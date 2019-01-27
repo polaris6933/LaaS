@@ -14,22 +14,32 @@ import (
 const connectionType = "tcp"
 const timeFormat = "Mon Jan 2 2006 15:04"
 
+type user struct {
+	name     string
+	password [sha256.Size]byte
+}
+
+func newUser(username, password string) *user {
+	passwordHash := sha256.Sum256([]byte(password))
+	return &user{name: username, password: passwordHash}
+}
+
 type session struct {
-	name         string
-	created      time.Time
-	passwordHash [sha256.Size]byte
+	name    string
+	created time.Time
+	owner   user
 }
 
 func NewSession(name string, password string) *session {
 	s := new(session)
 	s.name = name
 	s.created = time.Now()
-	s.passwordHash = sha256.Sum256([]byte(password))
 	return s
 }
 
 type Server struct {
 	sessions []*session
+	users    []user
 }
 
 func NewServer() *Server {
@@ -46,6 +56,31 @@ func (s *session) getStringRepresentation() string {
 
 func (s *session) String() string {
 	return fmt.Sprintf(s.getStringRepresentation())
+}
+
+func (s *Server) Register(username, password string) string {
+	for _, user := range s.users {
+		if user.name == username {
+			return "user with the name " + username + " already exists"
+		}
+	}
+	fmt.Println(password)
+	s.users = append(s.users, *newUser(username, password))
+	return "registered user " + username
+}
+
+func (s *Server) Login(username, password string) string {
+	fmt.Println(password)
+	for _, user := range s.users {
+		if user.name == username {
+			if user.password == sha256.Sum256([]byte(password)) {
+				return "user " + username + " logged in"
+			} else {
+				return "invalid password for " + username
+			}
+		}
+	}
+	return "user " + username + " does not exists"
 }
 
 func (s *Server) Add(name, pass string) string {
