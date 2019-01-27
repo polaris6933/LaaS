@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"fmt"
+	// "io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -25,15 +26,16 @@ func newUser(username, password string) *user {
 }
 
 type session struct {
+	owner   *user
 	name    string
 	created time.Time
-	owner   user
 }
 
-func NewSession(name string, password string) *session {
+func NewSession(name string, owner *user) *session {
 	s := new(session)
 	s.name = name
 	s.created = time.Now()
+	s.owner = owner
 	return s
 }
 
@@ -58,19 +60,21 @@ func (s *session) String() string {
 	return fmt.Sprintf(s.getStringRepresentation())
 }
 
+func (s *session) authorize(user string) bool {
+	return s.owner.name == user
+}
+
 func (s *Server) Register(username, password string) string {
 	for _, user := range s.users {
 		if user.name == username {
 			return "user with the name " + username + " already exists"
 		}
 	}
-	fmt.Println(password)
 	s.users = append(s.users, *newUser(username, password))
 	return "registered user " + username
 }
 
 func (s *Server) Login(username, password string) string {
-	fmt.Println(password)
 	for _, user := range s.users {
 		if user.name == username {
 			if user.password == sha256.Sum256([]byte(password)) {
@@ -83,19 +87,29 @@ func (s *Server) Login(username, password string) string {
 	return "user " + username + " does not exists"
 }
 
-func (s *Server) Add(name, pass string) string {
+func (s *Server) Add(username, name string) string {
 	for _, session := range s.sessions {
 		if session.name == name {
 			return "session with the name " + name + " already exists"
 		}
 	}
-	s.sessions = append(s.sessions, NewSession(name, pass))
+	var owner *user
+	for _, user := range s.users {
+		if user.name == username {
+			owner = &user
+			break
+		}
+	}
+	s.sessions = append(s.sessions, NewSession(name, owner))
 	return "created session " + name
 }
 
-func (s *Server) Remove(name string) string {
+func (s *Server) Remove(user, name string) string {
 	for idx, session := range s.sessions {
 		if session.name == name {
+			if !session.authorize(user) {
+				return "user " + user + " not authorized"
+			}
 			last := len(s.sessions) - 1
 			s.sessions[idx] = s.sessions[last]
 			s.sessions = s.sessions[:last]
@@ -138,7 +152,6 @@ func (s *Server) handleRequest(connection *net.Conn) {
 			return
 		}
 		request := strings.TrimRight(string(received), "\000")
-		fmt.Println(len(request))
 		execResult, err := executor.Execute(s, request)
 		if err != nil {
 			fmt.Println(err)
