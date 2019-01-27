@@ -106,15 +106,10 @@ func passwordConfirmation() string {
 	for {
 		firstAttempt = readPassword("input password: ")
 		secondAttempt = readPassword("confirm password: ")
-		if firstAttempt != secondAttempt {
-			fmt.Println("passwords do not match, try again")
-			continue
+		if firstAttempt == secondAttempt {
+			break
 		}
-		if firstAttempt == "" {
-			fmt.Println("empty password not allowed")
-			continue
-		}
-		break
+		fmt.Println("passwords do not match, try again")
 	}
 	return firstAttempt
 }
@@ -122,9 +117,15 @@ func passwordConfirmation() string {
 func readPassword(prompt string) string {
 	// TODO: add windows support
 	fmt.Print(prompt)
-	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		fmt.Println(err)
+	for {
+		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			fmt.Println(err)
+			return ""
+		}
+		if len(bytePassword) > 0 {
+			break
+		}
 	}
 	password := string(bytePassword)
 	fmt.Println()
