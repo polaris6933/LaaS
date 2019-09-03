@@ -1,4 +1,4 @@
-package main
+package life
 
 import (
 	"bufio"
@@ -15,7 +15,7 @@ type boardSymbol uint8
 const alive boardSymbol = '*'
 const dead boardSymbol = ' '
 
-type life struct {
+type Life struct {
 	startConfig  [][]boardSymbol
 	currentState [][]boardSymbol
 	tempState    [][]boardSymbol
@@ -32,8 +32,8 @@ func deep2DCopy(x, y int, board [][]boardSymbol) [][]boardSymbol {
 }
 
 // lines longer than 65536 characters are not supported
-func NewLife(path string) *life {
-	l := new(life)
+func NewLife(path string) *Life {
+	l := new(Life)
 
 	configFile, err := os.Open(path)
 	if err != nil {
@@ -77,7 +77,7 @@ func NewLife(path string) *life {
 	return l
 }
 
-func (l *life) printBoard() {
+func (l *Life) printBoard() {
 	for _, row := range l.currentState {
 		for _, symbol := range row {
 			fmt.Printf(" %c ", symbol)
@@ -86,7 +86,18 @@ func (l *life) printBoard() {
 	}
 }
 
-func (l *life) getAliveNeighboursCnt(x, y int) uint8 {
+func (l *Life) Printable() string {
+	board := ""
+	for _, row := range l.currentState {
+		for _, symbol := range row {
+			board += fmt.Sprintf(" %c ", symbol)
+		}
+		board += "\n"
+	}
+	return board
+}
+
+func (l *Life) getAliveNeighboursCnt(x, y int) uint8 {
 	var count uint8 = 0
 	var xUpperBoarder bool = x == 0
 	var xLowerBoarder bool = x == l.dimX-1
@@ -125,7 +136,7 @@ func (l *life) getAliveNeighboursCnt(x, y int) uint8 {
 	return count
 }
 
-func (l *life) livesOn(x, y int) bool {
+func (l *Life) livesOn(x, y int) bool {
 	aliveNeighboursCnt := l.getAliveNeighboursCnt(x, y)
 	if l.currentState[x][y] == alive {
 		return aliveNeighboursCnt == 2 || aliveNeighboursCnt == 3
@@ -134,7 +145,7 @@ func (l *life) livesOn(x, y int) bool {
 	}
 }
 
-func (l *life) nextGeneration() {
+func (l *Life) NextGeneration() {
 	for x, row := range l.currentState {
 		for y, _ := range row {
 			if l.livesOn(x, y) {
@@ -149,6 +160,92 @@ func (l *life) nextGeneration() {
 	l.tempState = tmp
 }
 
+func isNum(char rune) bool {
+	return char == '1' ||
+		char == '2' ||
+		char == '3' ||
+		char == '4' ||
+		char == '5' ||
+		char == '6' ||
+		char == '7' ||
+		char == '8' ||
+		char == '9' ||
+		char == '0'
+}
+
+func decodeInt(line string) (int, int) {
+	read := 0
+	for _, char := range line {
+		if !isNum(char) {
+			break
+		}
+		read++
+	}
+	res, _ := strconv.Atoi(line[:read])
+	if res == 0 {
+		res++
+	}
+	return res, read
+}
+
+func decodeConfig(path string) *Life {
+	l := new(Life)
+
+	config, err := os.Open(path)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+	defer config.Close()
+
+	scanner := bufio.NewScanner(config)
+	scanner.Scan()
+	dimensions := strings.Split(scanner.Text(), " ")
+	l.dimX, _ = strconv.Atoi(dimensions[0])
+	l.dimY, _ = strconv.Atoi(dimensions[1])
+	l.startConfig = make([][]boardSymbol, l.dimX)
+	for i := 0; i < l.dimX; i++ {
+		l.startConfig[i] = make([]boardSymbol, l.dimY)
+	}
+
+	currRow := 0
+	currCol := 0
+	var currSymbol byte
+	for scanner.Scan() {
+		line := scanner.Text()
+		lineLen := len(line)
+		read := 0
+		var write boardSymbol
+		for read < lineLen {
+			num, nextSymbol := decodeInt(line)
+			fmt.Println(num, nextSymbol)
+			currSymbol = line[nextSymbol]
+			read += nextSymbol + 1
+			line = line[nextSymbol+1:]
+			fmt.Println(line)
+			if currSymbol == 'b' {
+				write = dead
+			} else if currSymbol == 'o' {
+				write = alive
+			} else if currSymbol == '$' {
+				currRow++
+				currCol = 0
+				continue
+			} else {
+				break
+			}
+			for i := 0; i < num; i++ {
+				l.startConfig[currRow][currCol] = write
+				currCol++
+			}
+		}
+	}
+	l.currentState = deep2DCopy(l.dimX, l.dimY, l.startConfig)
+	l.tempState = deep2DCopy(l.dimX, l.dimY, l.startConfig)
+	return l
+}
+
+// TODO: remove this
 func clearScreen() {
 	cmd := exec.Command("clear")
 	cmd.Stdout = os.Stdout
@@ -156,11 +253,14 @@ func clearScreen() {
 }
 
 func main() {
+	// l := decodeConfig("predefined_configs/wtf")
+	// l.printBoard()
+	// time.Sleep(time.Second)
 	l := NewLife("predefined_configs/pulsar")
 	for {
 		clearScreen()
 		l.printBoard()
-		l.nextGeneration()
+		l.NextGeneration()
 		time.Sleep(time.Second)
 	}
 }

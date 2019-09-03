@@ -7,12 +7,20 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	"net"
 	"os"
+	"os/exec"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const connectionType = "tcp"
 const defaultUserName = "none"
+
+func clearScreen() {
+	cmd := exec.Command("clear")
+	cmd.Stdout = os.Stdout
+	cmd.Run()
+}
 
 type Client struct {
 	connection *net.Conn
@@ -50,6 +58,7 @@ func (c *Client) waitResponse() string {
 }
 
 func (c *Client) Register(username string) string {
+	// TODO: disallow empty user name
 	if username == defaultUserName {
 		return "user name " + defaultUserName + " not allowed"
 	}
@@ -96,11 +105,18 @@ func (c *Client) Disconnect() string {
 	return "disconnected from " + address
 }
 
-func (c *Client) Start(name string) string {
+func (c *Client) Add(name string) string {
 	if c.loggedAs == defaultUserName {
 		return "not logged in"
 	}
 	return c.makeRequest([]string{"add", c.loggedAs, name})
+}
+
+func (c *Client) Start(name, config string) string {
+	if c.loggedAs == defaultUserName {
+		return "not logged in"
+	}
+	return c.makeRequest([]string{"start", c.loggedAs, name, config})
 }
 
 func (c *Client) List() string {
@@ -112,6 +128,19 @@ func (c *Client) Kill(name string) string {
 		return "not logged in"
 	}
 	return c.makeRequest([]string{"remove", c.loggedAs, name})
+}
+
+func (c *Client) Watch(name string) string {
+	if c.loggedAs == defaultUserName {
+		return "not logged in"
+	}
+	for {
+		board := c.makeRequest([]string{"watch", c.loggedAs, name})
+		clearScreen()
+		fmt.Println(board)
+		time.Sleep(time.Second)
+	}
+	return "you were not meant to see this"
 }
 
 func save(args []string, connection *net.Conn) {
@@ -168,6 +197,20 @@ func main() {
 	client := NewClient()
 	var response string
 	defer client.Disconnect()
+	// response = client.Connect("localhost:8001")
+	// fmt.Println(response)
+	// response = client.Register("ivan")
+	// fmt.Println(response)
+	// response = client.Login("ivan")
+	// fmt.Println(response)
+	// response = client.Start("s")
+	// fmt.Println(response)
+	// response = client.Start("t")
+	// fmt.Println(response)
+	// response = client.Start("s")
+	// fmt.Println(response)
+	// response = client.Start("i")
+	// fmt.Println(response)
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		input, err := reader.ReadString('\n')

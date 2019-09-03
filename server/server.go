@@ -2,17 +2,18 @@ package main
 
 import (
 	"LaaS/executor"
+	"LaaS/life"
 	"bufio"
 	"crypto/sha256"
 	"fmt"
 	// "io/ioutil"
 	"net"
-	"os"
 	"strings"
 	"time"
 )
 
 const connectionType = "tcp"
+const port = ":8088"
 const timeFormat = "Mon Jan 2 2006 15:04"
 
 type user struct {
@@ -26,9 +27,10 @@ func newUser(username, password string) *user {
 }
 
 type session struct {
-	owner   *user
-	name    string
-	created time.Time
+	owner     *user
+	name      string
+	created   time.Time
+	currState *life.Life
 }
 
 func NewSession(name string, owner *user) *session {
@@ -54,6 +56,15 @@ func (s *Server) AssertExecutable() {}
 
 func (s *session) getStringRepresentation() string {
 	return "session " + s.name + ", created at " + s.created.Format(timeFormat)
+}
+
+func (s *Server) sessionIndex(name string) int {
+	for idx, session := range s.sessions {
+		if session.name == name {
+			return idx
+		}
+	}
+	return -1
 }
 
 func (s *session) String() string {
@@ -105,6 +116,7 @@ func (s *Server) Add(username, name string) string {
 }
 
 func (s *Server) Remove(user, name string) string {
+	// TODO: use sessionIndex()
 	for idx, session := range s.sessions {
 		if session.name == name {
 			if !session.authorize(user) {
@@ -116,7 +128,32 @@ func (s *Server) Remove(user, name string) string {
 			return "removed session " + name
 		}
 	}
-	return "no session with the name" + name + "found"
+	return "no session with the name " + name + " found"
+}
+
+// TODO: authorization
+func (s *Server) Start(user, session, config string) string {
+	index := s.sessionIndex(session)
+	if index == -1 {
+		return "no session with the name " + session + " found"
+	}
+	s.sessions[index].currState = life.NewLife("predefined_configs/" + config)
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			s.sessions[index].currState.NextGeneration()
+		}
+	}()
+
+	return "successfully started session " + session
+}
+
+func (s *Server) Watch(user, session string) string {
+	index := s.sessionIndex(session)
+	if index == -1 {
+		return "no session with the name " + session + " found"
+	}
+	return s.sessions[index].currState.Printable()
 }
 
 func pause(args []string, conection *net.Conn) {
@@ -146,6 +183,7 @@ func (s *Server) handleRequest(connection *net.Conn) {
 	fmt.Println("serving", connectionAddress)
 	var response string
 	for {
+		fmt.Println("entered for")
 		received, err := bufio.NewReader(*connection).ReadString('\000')
 		if err != nil {
 			fmt.Println(err)
@@ -162,16 +200,10 @@ func (s *Server) handleRequest(connection *net.Conn) {
 		(*connection).Write([]byte(response + "\000"))
 		fmt.Println(connectionAddress, "-", response)
 	}
+	fmt.Println("this shit ends now")
 }
 
 func main() {
-	args := os.Args
-	if len(args) != 2 {
-		fmt.Println("argument error")
-		return
-	}
-
-	port := ":" + args[1]
 	l, err := net.Listen(connectionType, port)
 	if err != nil {
 		fmt.Println(err)
