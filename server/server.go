@@ -31,6 +31,7 @@ type session struct {
 	name      string
 	created   time.Time
 	currState *life.Life
+	killer    chan string
 }
 
 func NewSession(name string, owner *user) *session {
@@ -131,21 +132,40 @@ func (s *Server) Remove(user, name string) string {
 	return "no session with the name " + name + " found"
 }
 
+func (s *session) run() {
+	for {
+		select {
+		case <-s.killer:
+			return
+		default:
+			time.Sleep(time.Second)
+			s.currState.NextGeneration()
+		}
+	}
+}
+
 // TODO: authorization
-func (s *Server) Start(user, session, config string) string {
+func (s *Server) Start(user, name, config string) string {
+	index := s.sessionIndex(name)
+	if index == -1 {
+		return "no session with the name " + name + " found"
+	}
+	session := s.sessions[index]
+	session.currState = life.NewLife("predefined_configs/" + config)
+	session.killer = make(chan string)
+	go session.run()
+
+	return "successfully started session " + name
+}
+
+// TODO: authorization
+func (s *Server) Kill(user, session string) string {
 	index := s.sessionIndex(session)
 	if index == -1 {
 		return "no session with the name " + session + " found"
 	}
-	s.sessions[index].currState = life.NewLife("predefined_configs/" + config)
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			s.sessions[index].currState.NextGeneration()
-		}
-	}()
-
-	return "successfully started session " + session
+	s.sessions[index].killer <- "die"
+	return "session " + session + " successfully killed"
 }
 
 func (s *Server) Watch(user, session string) string {
@@ -183,7 +203,6 @@ func (s *Server) handleRequest(connection *net.Conn) {
 	fmt.Println("serving", connectionAddress)
 	var response string
 	for {
-		fmt.Println("entered for")
 		received, err := bufio.NewReader(*connection).ReadString('\000')
 		if err != nil {
 			fmt.Println(err)
@@ -200,7 +219,6 @@ func (s *Server) handleRequest(connection *net.Conn) {
 		(*connection).Write([]byte(response + "\000"))
 		fmt.Println(connectionAddress, "-", response)
 	}
-	fmt.Println("this shit ends now")
 }
 
 func main() {

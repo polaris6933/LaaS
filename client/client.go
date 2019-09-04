@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
 	"syscall"
 	"time"
@@ -123,24 +124,38 @@ func (c *Client) List() string {
 	return c.makeRequest([]string{"list"})
 }
 
+// TODO: implement actual remove
 func (c *Client) Kill(name string) string {
 	if c.loggedAs == defaultUserName {
 		return "not logged in"
 	}
-	return c.makeRequest([]string{"remove", c.loggedAs, name})
+	return c.makeRequest([]string{"kill", c.loggedAs, name})
+}
+
+func (c *Client) displayGame(s chan os.Signal, name string) {
+	for {
+		select {
+		case <-s:
+			clearScreen()
+			signal.Reset(os.Interrupt)
+			return
+		default:
+			board := c.makeRequest([]string{"watch", c.loggedAs, name})
+			clearScreen()
+			fmt.Println(board)
+			time.Sleep(time.Second)
+		}
+	}
 }
 
 func (c *Client) Watch(name string) string {
 	if c.loggedAs == defaultUserName {
 		return "not logged in"
 	}
-	for {
-		board := c.makeRequest([]string{"watch", c.loggedAs, name})
-		clearScreen()
-		fmt.Println(board)
-		time.Sleep(time.Second)
-	}
-	return "you were not meant to see this"
+	s := make(chan os.Signal, 2)
+	signal.Notify(s, os.Interrupt)
+	go c.displayGame(s, name)
+	return "game is not being displayed"
 }
 
 func save(args []string, connection *net.Conn) {
