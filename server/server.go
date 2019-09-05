@@ -76,6 +76,22 @@ func (s *Server) sessionIndex(name string) int {
 	return -1
 }
 
+func (s *session) run() {
+	s.isRunning = true
+	s.stopper = make(chan string)
+	for {
+		select {
+		case <-s.stopper:
+			s.isRunning = false
+			close(s.stopper)
+			return
+		default:
+			time.Sleep(time.Second)
+			s.currState.NextGeneration()
+		}
+	}
+}
+
 func (s *session) String() string {
 	return fmt.Sprintf(s.getStringRepresentation())
 }
@@ -84,34 +100,39 @@ func (s *session) authorize(user string) bool {
 	return s.owner.name == user
 }
 
-func (s *Server) Register(username, password string) string {
-	for _, user := range s.users {
-		if user.name == username {
-			return "user with the name " + username + " already exists"
+func (s *Server) userIndex(name string) int {
+	for idx, user := range s.users {
+		if user.name == name {
+			return idx
 		}
+	}
+	return -1
+}
+
+func (s *Server) Register(username, password string) string {
+	if s.userIndex(username) != -1 {
+		return "user with the name " + username + " already exists"
 	}
 	s.users = append(s.users, *newUser(username, password))
 	return "registered user " + username
 }
 
 func (s *Server) Login(username, password string) string {
-	for _, user := range s.users {
-		if user.name == username {
-			if user.password == sha256.Sum256([]byte(password)) {
-				return "user " + username + " logged in"
-			} else {
-				return "invalid password for " + username
-			}
-		}
+	index := s.userIndex(username)
+	if index == -1 {
+		return "user " + username + " does not exists"
 	}
-	return "user " + username + " does not exists"
+	user := s.users[index]
+	if user.password == sha256.Sum256([]byte(password)) {
+		return "user " + username + " logged in"
+	} else {
+		return "invalid password for " + username
+	}
 }
 
 func (s *Server) Add(username, name string) string {
-	for _, session := range s.sessions {
-		if session.name == name {
-			return "session with the name " + name + " already exists"
-		}
+	if s.sessionIndex(name) != -1 {
+		return "session with the name " + name + " already exists"
 	}
 	var owner *user
 	for _, user := range s.users {
@@ -127,7 +148,7 @@ func (s *Server) Add(username, name string) string {
 func (s *Server) Kill(user, name string) string {
 	index := s.sessionIndex(name)
 	if index == -1 {
-		return "no session with the name " + name + " found"
+		return noSession(name)
 	}
 	current := s.sessions[index]
 	if !current.authorize(user) {
@@ -140,22 +161,6 @@ func (s *Server) Kill(user, name string) string {
 	s.sessions[index] = s.sessions[last]
 	s.sessions = s.sessions[:last]
 	return "session " + name + " successfuly killed"
-}
-
-func (s *session) run() {
-	s.isRunning = true
-	s.stopper = make(chan string)
-	for {
-		select {
-		case <-s.stopper:
-			s.isRunning = false
-			close(s.stopper)
-			return
-		default:
-			time.Sleep(time.Second)
-			s.currState.NextGeneration()
-		}
-	}
 }
 
 func (s *Server) Start(user, name, config string) string {
