@@ -16,6 +16,8 @@ import (
 
 const connectionType = "tcp"
 const defaultUserName = "none"
+const hostname = "localhost"
+const port = ":8088"
 
 func clearScreen() {
 	cmd := exec.Command("clear")
@@ -37,16 +39,32 @@ func NewClient() *Client {
 
 func (c Client) AssertExecutable() {}
 
+func (c *Client) attemptRecconect() {
+	for {
+		fmt.Println("attempting to reconnect")
+		connect := c.Connect(hostname + port)
+		if connect != "" {
+			fmt.Println(connect)
+			break
+		}
+		time.Sleep(time.Second)
+	}
+}
+
 func (c *Client) makeRequest(requestArgs []string) string {
 	if c.connection == nil {
 		return "not connected to server atm"
 	}
 	request := strings.Join(requestArgs, " ")
 	request = request + "\000"
-	fmt.Println(request)
 	fmt.Fprintf(*c.connection, request)
 
-	return c.waitResponse()
+	response := c.waitResponse()
+	if response == "" {
+		fmt.Println("connection to the server has been lost")
+		c.attemptRecconect()
+	}
+	return response
 }
 
 func (c *Client) waitResponse() string {
@@ -213,20 +231,9 @@ func main() {
 	client := NewClient()
 	var response string
 	defer client.Disconnect()
-	// response = client.Connect("localhost:8001")
-	// fmt.Println(response)
-	// response = client.Register("ivan")
-	// fmt.Println(response)
-	// response = client.Login("ivan")
-	// fmt.Println(response)
-	// response = client.Start("s")
-	// fmt.Println(response)
-	// response = client.Start("t")
-	// fmt.Println(response)
-	// response = client.Start("s")
-	// fmt.Println(response)
-	// response = client.Start("i")
-	// fmt.Println(response)
+	connect := client.Connect(hostname + port)
+	fmt.Println(connect)
+
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		input, err := reader.ReadString('\n')
