@@ -120,11 +120,25 @@ func (c *Client) Start(name, config string) string {
 	return c.makeRequest([]string{"start", c.loggedAs, name, config})
 }
 
+func (c *Client) Resume(name string) string {
+	if c.loggedAs == defaultUserName {
+		return "not logged in"
+	}
+	return c.makeRequest([]string{"resume", c.loggedAs, name})
+}
+
 func (c *Client) List() string {
 	return c.makeRequest([]string{"list"})
 }
 
 // TODO: implement actual remove
+func (c *Client) Stop(name string) string {
+	if c.loggedAs == defaultUserName {
+		return "not logged in"
+	}
+	return c.makeRequest([]string{"stop", c.loggedAs, name})
+}
+
 func (c *Client) Kill(name string) string {
 	if c.loggedAs == defaultUserName {
 		return "not logged in"
@@ -155,19 +169,7 @@ func (c *Client) Watch(name string) string {
 	s := make(chan os.Signal, 2)
 	signal.Notify(s, os.Interrupt)
 	go c.displayGame(s, name)
-	return "game is not being displayed"
-}
-
-func save(args []string, connection *net.Conn) {
-	fmt.Println("save()", args)
-}
-
-func pause(args []string, connection *net.Conn) {
-	fmt.Println("pause()", args)
-}
-
-func resume(args []string, connection *net.Conn) {
-	fmt.Println("resume()", args)
+	return "game is now being displayed"
 }
 
 func (c *Client) Exit() {

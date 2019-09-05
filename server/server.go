@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"fmt"
-	// "io/ioutil"
 	"net"
 	"strings"
 	"time"
@@ -31,7 +30,8 @@ type session struct {
 	name      string
 	created   time.Time
 	currState *life.Life
-	killer    chan string
+	stopper   chan string
+	isRunning bool
 }
 
 func NewSession(name string, owner *user) *session {
@@ -116,26 +116,36 @@ func (s *Server) Add(username, name string) string {
 	return "created session " + name
 }
 
-func (s *Server) Remove(user, name string) string {
+func (s *Server) Kill(user, name string) string {
 	// TODO: use sessionIndex()
+	fmt.Println("entered kill")
 	for idx, session := range s.sessions {
 		if session.name == name {
 			if !session.authorize(user) {
 				return "user " + user + " not authorized"
 			}
+			current := s.sessions[idx]
+			if current.isRunning {
+				fmt.Println("session is running")
+				current.stopper <- "stop"
+			}
 			last := len(s.sessions) - 1
 			s.sessions[idx] = s.sessions[last]
 			s.sessions = s.sessions[:last]
-			return "removed session " + name
+			return "session " + name + " successfuly killed"
 		}
 	}
 	return "no session with the name " + name + " found"
 }
 
 func (s *session) run() {
+	s.isRunning = true
+	s.stopper = make(chan string)
 	for {
 		select {
-		case <-s.killer:
+		case <-s.stopper:
+			s.isRunning = false
+			close(s.stopper)
 			return
 		default:
 			time.Sleep(time.Second)
@@ -150,22 +160,31 @@ func (s *Server) Start(user, name, config string) string {
 	if index == -1 {
 		return "no session with the name " + name + " found"
 	}
-	session := s.sessions[index]
 	session.currState = life.NewLife("predefined_configs/" + config)
-	session.killer = make(chan string)
-	go session.run()
+	go s.sessions[index].run()
 
 	return "successfully started session " + name
 }
 
 // TODO: authorization
-func (s *Server) Kill(user, session string) string {
+func (s *Server) Resume(user, name string) string {
+	index := s.sessionIndex(name)
+	if index == -1 {
+		return "no session with the name " + name + " found"
+	}
+	go s.sessions[index].run()
+
+	return "successfully resumed session " + name
+}
+
+// TODO: authorization
+func (s *Server) Stop(user, session string) string {
 	index := s.sessionIndex(session)
 	if index == -1 {
 		return "no session with the name " + session + " found"
 	}
-	s.sessions[index].killer <- "die"
-	return "session " + session + " successfully killed"
+	s.sessions[index] <- "stop"
+	return "session " + session + " successfully stopped"
 }
 
 func (s *Server) Watch(user, session string) string {
@@ -174,18 +193,6 @@ func (s *Server) Watch(user, session string) string {
 		return "no session with the name " + session + " found"
 	}
 	return s.sessions[index].currState.Printable()
-}
-
-func pause(args []string, conection *net.Conn) {
-	fmt.Println("pause()", args)
-}
-
-func resume(args []string, conection *net.Conn) {
-	fmt.Println("resume()", args)
-}
-
-func export(args []string, conection *net.Conn) {
-	fmt.Println("export()", args)
 }
 
 func (s *Server) List() string {
@@ -217,7 +224,9 @@ func (s *Server) handleRequest(connection *net.Conn) {
 			response = execResult[0].Interface().(string)
 		}
 		(*connection).Write([]byte(response + "\000"))
-		fmt.Println(connectionAddress, "-", response)
+		if !strings.HasPrefix(request, "watch") {
+			fmt.Println(connectionAddress, "-", response)
+		}
 	}
 }
 
