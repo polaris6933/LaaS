@@ -118,24 +118,38 @@ func (s *Server) Add(username, name string) string {
 
 func (s *Server) Kill(user, name string) string {
 	// TODO: use sessionIndex()
-	fmt.Println("entered kill")
-	for idx, session := range s.sessions {
-		if session.name == name {
-			if !session.authorize(user) {
-				return "user " + user + " not authorized"
-			}
-			current := s.sessions[idx]
-			if current.isRunning {
-				fmt.Println("session is running")
-				current.stopper <- "stop"
-			}
-			last := len(s.sessions) - 1
-			s.sessions[idx] = s.sessions[last]
-			s.sessions = s.sessions[:last]
-			return "session " + name + " successfuly killed"
-		}
+	// for idx, session := range s.sessions {
+	// 	if session.name == name {
+	// 		if !session.authorize(user) {
+	// 			return "user " + user + " not authorized"
+	// 		}
+	// 		current := s.sessions[idx]
+	// 		if current.isRunning {
+	// 			fmt.Println("session is running")
+	// 			current.stopper <- "stop"
+	// 		}
+	// 		last := len(s.sessions) - 1
+	// 		s.sessions[idx] = s.sessions[last]
+	// 		s.sessions = s.sessions[:last]
+	// 		return "session " + name + " successfuly killed"
+	// 	}
+	// }
+
+	index := s.sessionIndex(name)
+	if index == -1 {
+		return "no session with the name " + name + " found"
 	}
-	return "no session with the name " + name + " found"
+	current := s.sessions[index]
+	if !current.authorize(user) {
+		return "user " + user + " not authorized"
+	}
+	if current.isRunning {
+		current.stopper <- "stop"
+	}
+	last := len(s.sessions) - 1
+	s.sessions[index] = s.sessions[last]
+	s.sessions = s.sessions[:last]
+	return "session " + name + " successfuly killed"
 }
 
 func (s *session) run() {
@@ -160,8 +174,9 @@ func (s *Server) Start(user, name, config string) string {
 	if index == -1 {
 		return "no session with the name " + name + " found"
 	}
+	session := s.sessions[index]
 	session.currState = life.NewLife("predefined_configs/" + config)
-	go s.sessions[index].run()
+	go session.run()
 
 	return "successfully started session " + name
 }
@@ -183,7 +198,7 @@ func (s *Server) Stop(user, session string) string {
 	if index == -1 {
 		return "no session with the name " + session + " found"
 	}
-	s.sessions[index] <- "stop"
+	s.sessions[index].stopper <- "stop"
 	return "session " + session + " successfully stopped"
 }
 
