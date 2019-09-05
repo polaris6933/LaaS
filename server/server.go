@@ -53,6 +53,14 @@ func NewServer() *Server {
 	return s
 }
 
+func notAuthorized(name string) string {
+	return "user " + name + " not authorized"
+}
+
+func noSession(name string) string {
+	return "no session with the name " + name + " found"
+}
+
 func (s *Server) AssertExecutable() {}
 
 func (s *session) getStringRepresentation() string {
@@ -117,31 +125,13 @@ func (s *Server) Add(username, name string) string {
 }
 
 func (s *Server) Kill(user, name string) string {
-	// TODO: use sessionIndex()
-	// for idx, session := range s.sessions {
-	// 	if session.name == name {
-	// 		if !session.authorize(user) {
-	// 			return "user " + user + " not authorized"
-	// 		}
-	// 		current := s.sessions[idx]
-	// 		if current.isRunning {
-	// 			fmt.Println("session is running")
-	// 			current.stopper <- "stop"
-	// 		}
-	// 		last := len(s.sessions) - 1
-	// 		s.sessions[idx] = s.sessions[last]
-	// 		s.sessions = s.sessions[:last]
-	// 		return "session " + name + " successfuly killed"
-	// 	}
-	// }
-
 	index := s.sessionIndex(name)
 	if index == -1 {
 		return "no session with the name " + name + " found"
 	}
 	current := s.sessions[index]
 	if !current.authorize(user) {
-		return "user " + user + " not authorized"
+		return notAuthorized(user)
 	}
 	if current.isRunning {
 		current.stopper <- "stop"
@@ -168,37 +158,45 @@ func (s *session) run() {
 	}
 }
 
-// TODO: authorization
 func (s *Server) Start(user, name, config string) string {
 	index := s.sessionIndex(name)
 	if index == -1 {
-		return "no session with the name " + name + " found"
+		return noSession(name)
 	}
-	session := s.sessions[index]
-	session.currState = life.NewLife("predefined_configs/" + config)
-	go session.run()
+	current := s.sessions[index]
+	if !current.authorize(user) {
+		return notAuthorized(user)
+	}
+	current.currState = life.NewLife("predefined_configs/" + config)
+	go current.run()
 
 	return "successfully started session " + name
 }
 
-// TODO: authorization
 func (s *Server) Resume(user, name string) string {
 	index := s.sessionIndex(name)
 	if index == -1 {
-		return "no session with the name " + name + " found"
+		return noSession(name)
 	}
-	go s.sessions[index].run()
+	current := s.sessions[index]
+	if !current.authorize(user) {
+		return notAuthorized(user)
+	}
+	go current.run()
 
 	return "successfully resumed session " + name
 }
 
-// TODO: authorization
 func (s *Server) Stop(user, session string) string {
 	index := s.sessionIndex(session)
 	if index == -1 {
 		return "no session with the name " + session + " found"
 	}
-	s.sessions[index].stopper <- "stop"
+	current := s.sessions[index]
+	if !current.authorize(user) {
+		return notAuthorized(user)
+	}
+	current.stopper <- "stop"
 	return "session " + session + " successfully stopped"
 }
 
