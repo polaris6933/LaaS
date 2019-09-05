@@ -59,9 +59,10 @@ func (c *Client) waitResponse() string {
 }
 
 func (c *Client) Register(username string) string {
-	// TODO: disallow empty user name
 	if username == defaultUserName {
 		return "user name " + defaultUserName + " not allowed"
+	} else if username == "" {
+		return "uesr name must not be empty"
 	}
 	password := passwordConfirmation()
 	response := c.makeRequest([]string{"register", username, password})
@@ -131,7 +132,6 @@ func (c *Client) List() string {
 	return c.makeRequest([]string{"list"})
 }
 
-// TODO: implement actual remove
 func (c *Client) Stop(name string) string {
 	if c.loggedAs == defaultUserName {
 		return "not logged in"
@@ -191,7 +191,6 @@ func passwordConfirmation() string {
 }
 
 func readPassword(prompt string) string {
-	// TODO: add windows support
 	fmt.Print(prompt)
 	var bytePassword []byte
 	var err error
