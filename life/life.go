@@ -3,11 +3,10 @@ package life
 import (
 	"bufio"
 	"fmt"
+	"errors"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type boardSymbol uint8
@@ -32,13 +31,12 @@ func deep2DCopy(x, y int, board [][]boardSymbol) [][]boardSymbol {
 }
 
 // lines longer than 65536 characters are not supported
-func NewLife(path string) *Life {
+func NewLife(path string) (*Life, error) {
 	l := new(Life)
 
 	configFile, err := os.Open(path)
 	if err != nil {
-		fmt.Println(err)
-		return nil
+		return nil, errors.New("the configuration you specified does not exist")
 	}
 	defer configFile.Close()
 
@@ -60,21 +58,19 @@ func NewLife(path string) *Life {
 			} else if char == '*' {
 				write = alive
 			} else {
-				fmt.Println("invalid config")
-				return nil
+				return nil, errors.New("infalid config")
 			}
 			l.startConfig[curRow][curCol] = write
 		}
 		curRow++
 	}
 	if curRow != l.dimX {
-		fmt.Println("invalid config")
-		return nil
+		return nil, errors.New("infalid config")
 	}
 
 	l.currentState = deep2DCopy(l.dimX, l.dimY, l.startConfig)
 	l.tempState = deep2DCopy(l.dimX, l.dimY, l.startConfig)
-	return l
+	return l, nil
 }
 
 func (l *Life) printBoard() {
@@ -245,22 +241,12 @@ func decodeConfig(path string) *Life {
 	return l
 }
 
-// TODO: remove this
-func clearScreen() {
-	cmd := exec.Command("clear")
-	cmd.Stdout = os.Stdout
-	cmd.Run()
-}
-
-func main() {
-	// l := decodeConfig("predefined_configs/wtf")
-	// l.printBoard()
-	// time.Sleep(time.Second)
-	l := NewLife("predefined_configs/pulsar")
-	for {
-		clearScreen()
-		l.printBoard()
-		l.NextGeneration()
-		time.Sleep(time.Second)
-	}
-}
+// func main() {
+// 	l := NewLife("predefined_configs/pulsar")
+// 	for {
+// 		clearScreen()
+// 		l.printBoard()
+// 		l.NextGeneration()
+// 		time.Sleep(time.Second)
+// 	}
+// }

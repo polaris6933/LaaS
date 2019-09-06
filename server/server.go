@@ -172,7 +172,12 @@ func (s *Server) Start(user, name, config string) string {
 	if !current.authorize(user) {
 		return notAuthorized(user)
 	}
-	current.currState = life.NewLife("predefined_configs/" + config)
+	newLife, err := life.NewLife("predefined_configs/" + config)
+	if err != nil {
+		return err.Error()
+	}
+
+	current.currState = newLife
 	go current.run()
 
 	return "successfully started session " + name
