@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"errors"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -13,6 +14,7 @@ type boardSymbol uint8
 
 const alive boardSymbol = '*'
 const dead boardSymbol = ' '
+const configFolder = "predefined_configs"
 
 type Life struct {
 	startConfig  [][]boardSymbol
@@ -31,10 +33,10 @@ func deep2DCopy(x, y int, board [][]boardSymbol) [][]boardSymbol {
 }
 
 // lines longer than 65536 characters are not supported
-func NewLife(path string) (*Life, error) {
+func NewLife(config string) (*Life, error) {
 	l := new(Life)
 
-	configFile, err := os.Open(path)
+	configFile, err := os.Open(path.Join(configFolder, config))
 	if err != nil {
 		return nil, errors.New("the configuration you specified does not exist")
 	}

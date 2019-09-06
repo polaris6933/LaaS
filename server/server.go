@@ -67,15 +67,6 @@ func (s *session) getStringRepresentation() string {
 	return "session " + s.name + ", created at " + s.created.Format(timeFormat)
 }
 
-func (s *Server) sessionIndex(name string) int {
-	for idx, session := range s.sessions {
-		if session.name == name {
-			return idx
-		}
-	}
-	return -1
-}
-
 func (s *session) run() {
 	go func() {
 		s.isRunning = true
@@ -104,6 +95,15 @@ func (s *session) String() string {
 
 func (s *session) authorize(user string) bool {
 	return s.owner.name == user
+}
+
+func (s *Server) sessionIndex(name string) int {
+	for idx, session := range s.sessions {
+		if session.name == name {
+			return idx
+		}
+	}
+	return -1
 }
 
 func (s *Server) userIndex(name string) int {
@@ -140,13 +140,7 @@ func (s *Server) Add(username, name string) string {
 	if s.sessionIndex(name) != -1 {
 		return "session with the name " + name + " already exists"
 	}
-	var owner *user
-	for _, user := range s.users {
-		if user.name == username {
-			owner = &user
-			break
-		}
-	}
+	owner := &s.users[s.userIndex(username)]
 	s.sessions = append(s.sessions, NewSession(name, owner))
 	return "created session " + name
 }
@@ -178,7 +172,11 @@ func (s *Server) Start(user, name, config string) string {
 	if !current.authorize(user) {
 		return notAuthorized(user)
 	}
-	newLife, err := life.NewLife("predefined_configs/" + config)
+	if current.isRunning {
+		return "session " + name + " is already running"
+	}
+
+	newLife, err := life.NewLife(config)
 	if err != nil {
 		return err.Error()
 	}
@@ -198,6 +196,9 @@ func (s *Server) Resume(user, name string) string {
 	if !current.authorize(user) {
 		return notAuthorized(user)
 	}
+	if current.isRunning {
+		return "session " + name + " is already running"
+	}
 	current.run()
 
 	return "successfully resumed session " + name
@@ -211,6 +212,9 @@ func (s *Server) Stop(user, session string) string {
 	current := s.sessions[index]
 	if !current.authorize(user) {
 		return notAuthorized(user)
+	}
+	if !current.isRunning {
+		return "session " + session + " is already stopped"
 	}
 	current.stop()
 	return "session " + session + " successfully stopped"
