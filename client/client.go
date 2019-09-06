@@ -40,6 +40,7 @@ func NewClient() *Client {
 func (c Client) AssertExecutable() {}
 
 func (c *Client) attemptRecconect() {
+	c.loggedAs = defaultUserName
 	for {
 		fmt.Println("attempting to reconnect")
 		connect := c.Connect(hostname + port)
