@@ -117,7 +117,7 @@ func (s *Server) userIndex(name string) int {
 
 func (s *Server) Register(username, password string) string {
 	if s.userIndex(username) != -1 {
-		return "user with the name " + username + " already exists"
+		return "user " + username + " already exists"
 	}
 	s.users = append(s.users, *newUser(username, password))
 	return "registered user " + username
@@ -126,7 +126,7 @@ func (s *Server) Register(username, password string) string {
 func (s *Server) Login(username, password string) string {
 	index := s.userIndex(username)
 	if index == -1 {
-		return "user " + username + " does not exists"
+		return "user " + username + " does not exist"
 	}
 	user := s.users[index]
 	if user.password == sha256.Sum256([]byte(password)) {
@@ -142,7 +142,7 @@ func (s *Server) Add(username, name string) string {
 	}
 	owner := &s.users[s.userIndex(username)]
 	s.sessions = append(s.sessions, NewSession(name, owner))
-	return "created session " + name
+	return "successfully created session " + name
 }
 
 func (s *Server) Kill(user, name string) string {
@@ -160,7 +160,7 @@ func (s *Server) Kill(user, name string) string {
 	last := len(s.sessions) - 1
 	s.sessions[index] = s.sessions[last]
 	s.sessions = s.sessions[:last]
-	return "session " + name + " successfuly killed"
+	return "session " + name + " successfully killed"
 }
 
 func (s *Server) Start(user, name, config string) string {
