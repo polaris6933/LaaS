@@ -77,19 +77,25 @@ func (s *Server) sessionIndex(name string) int {
 }
 
 func (s *session) run() {
-	s.isRunning = true
-	s.stopper = make(chan string)
-	for {
-		select {
-		case <-s.stopper:
-			s.isRunning = false
-			close(s.stopper)
-			return
-		default:
-			time.Sleep(time.Second)
-			s.currState.NextGeneration()
+	go func() {
+		s.isRunning = true
+		s.stopper = make(chan string)
+		for {
+			select {
+			case <-s.stopper:
+				s.isRunning = false
+				close(s.stopper)
+				return
+			default:
+				time.Sleep(time.Second)
+				s.currState.NextGeneration()
+			}
 		}
-	}
+	}()
+}
+
+func (s *session) stop() {
+	s.stopper<- "stop"
 }
 
 func (s *session) String() string {
@@ -155,7 +161,7 @@ func (s *Server) Kill(user, name string) string {
 		return notAuthorized(user)
 	}
 	if current.isRunning {
-		current.stopper <- "stop"
+		current.stop()
 	}
 	last := len(s.sessions) - 1
 	s.sessions[index] = s.sessions[last]
@@ -178,7 +184,7 @@ func (s *Server) Start(user, name, config string) string {
 	}
 
 	current.currState = newLife
-	go current.run()
+	current.run()
 
 	return "successfully started session " + name
 }
@@ -192,7 +198,7 @@ func (s *Server) Resume(user, name string) string {
 	if !current.authorize(user) {
 		return notAuthorized(user)
 	}
-	go current.run()
+	current.run()
 
 	return "successfully resumed session " + name
 }
@@ -206,7 +212,7 @@ func (s *Server) Stop(user, session string) string {
 	if !current.authorize(user) {
 		return notAuthorized(user)
 	}
-	current.stopper <- "stop"
+	current.stop()
 	return "session " + session + " successfully stopped"
 }
 
