@@ -1,3 +1,4 @@
+// Package life contains the logic running the game of life.
 package life
 
 import (
@@ -16,6 +17,10 @@ const alive boardSymbol = '*'
 const dead boardSymbol = ' '
 const configFolder = "predefined_configs"
 
+// The game is represented by its current state.
+// Additionally, the dimensions of the board are recorded as well as a
+// temporary state used for computing the next generation and the beginning
+// state is recorded so it can be restored.
 type Life struct {
 	startConfig  [][]boardSymbol
 	currentState [][]boardSymbol
@@ -32,7 +37,8 @@ func deep2DCopy(x, y int, board [][]boardSymbol) [][]boardSymbol {
 	return res
 }
 
-// lines longer than 65536 characters are not supported
+// Constructs a new game by reading the provided `config`.
+// Configurations containing lines longer than 65536 characters are not supported.
 func NewLife(config string) (*Life, error) {
 	l := new(Life)
 
@@ -75,15 +81,7 @@ func NewLife(config string) (*Life, error) {
 	return l, nil
 }
 
-func (l *Life) printBoard() {
-	for _, row := range l.currentState {
-		for _, symbol := range row {
-			fmt.Printf(" %c ", symbol)
-		}
-		fmt.Println()
-	}
-}
-
+// Returns a string representing the current state of the game.
 func (l *Life) Printable() string {
 	board := ""
 	for _, row := range l.currentState {
@@ -143,6 +141,7 @@ func (l *Life) livesOn(x, y int) bool {
 	}
 }
 
+// Computes the next generation of the game and updates the state.
 func (l *Life) NextGeneration() {
 	for x, row := range l.currentState {
 		for y, _ := range row {
@@ -233,13 +232,3 @@ func decodeConfig(path string) *Life {
 	l.tempState = deep2DCopy(l.dimX, l.dimY, l.startConfig)
 	return l
 }
-
-// func main() {
-// 	l := NewLife("predefined_configs/pulsar")
-// 	for {
-// 		clearScreen()
-// 		l.printBoard()
-// 		l.NextGeneration()
-// 		time.Sleep(time.Second)
-// 	}
-// }
