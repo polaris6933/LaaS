@@ -2,6 +2,8 @@ package main
 
 import (
 	"LaaS/life"
+	"LaaS/server/session"
+	"LaaS/server/user"
 	"fmt"
 	"strconv"
 	"strings"
@@ -19,11 +21,11 @@ func assert(actual, expected string, t *testing.T) {
 	}
 }
 
-func getTestSession() *session {
-	u := newUser(test_user, test_password)
-	s := NewSession("test_session", u)
+func getTestSession() *session.Session {
+	u := user.NewUser(test_user, test_password)
+	s := session.NewSession("test_session", u)
 	nl, _ := life.NewLife("pulsar")
-	s.currState = nl
+	s.CurrState = nl
 	return s
 }
 
@@ -39,11 +41,11 @@ func getTestServer() *Server {
 func TestSessionRunProperlyStops(t *testing.T) {
 	t.Parallel()
 	s := getTestSession()
-	s.run()
+	s.Run()
 	time.Sleep(time.Second)
-	s.stop()
+	s.Stop()
 	time.Sleep(time.Second)
-	if s.isRunning {
+	if s.IsRunning {
 		t.Fatal("expected session to stop running, it keeps going")
 	}
 }
@@ -51,10 +53,10 @@ func TestSessionRunProperlyStops(t *testing.T) {
 func TestSessionAuthorize(t *testing.T) {
 	t.Parallel()
 	s := getTestSession()
-	if !s.authorize(test_user) {
+	if !s.Authorize(test_user) {
 		t.Fatal("authorization with correct credentials failed")
 	}
-	if s.authorize("adsf") {
+	if s.Authorize("adsf") {
 		t.Fatal("authorization with incorrect credentials failed")
 	}
 }
@@ -125,7 +127,7 @@ func TestStartProper(t *testing.T) {
 	assert(result, expected, t)
 
 	time.Sleep(time.Second)
-	if !s.sessions[0].isRunning {
+	if !s.sessions[0].IsRunning {
 		t.Fatal("session is not running")
 	}
 }
@@ -167,27 +169,27 @@ func TestKillRunning(t *testing.T) {
 func TestKillNoSession(t *testing.T) {
 	t.Parallel()
 	s := getTestServer()
-	session := "no_session"
-	result := s.Kill(test_user, session)
-	expected := noSession(session)
+	sessionName := "no_session"
+	result := s.Kill(test_user, sessionName)
+	expected := session.NoSession(sessionName)
 	assert(result, expected, t)
 }
 
 func TestKillNotAuthorized(t *testing.T) {
 	t.Parallel()
 	s := getTestServer()
-	user := "no_user"
-	result := s.Kill(user, test_session)
-	expected := notAuthorized(user)
+	username := "no_user"
+	result := s.Kill(username, test_session)
+	expected := user.NotAuthorized(username)
 	assert(result, expected, t)
 }
 
 func TestStartBadSession(t *testing.T) {
 	t.Parallel()
 	s := getTestServer()
-	session := "test_sessionX"
-	result := s.Start(test_user, session, "pulsar")
-	assert(result, noSession(session), t)
+	sessionName := "test_sessionX"
+	result := s.Start(test_user, sessionName, "pulsar")
+	assert(result, session.NoSession(sessionName), t)
 }
 
 func TestStartRunnigSession(t *testing.T) {
@@ -203,9 +205,9 @@ func TestStartRunnigSession(t *testing.T) {
 func TestStartBadUser(t *testing.T) {
 	t.Parallel()
 	s := getTestServer()
-	user := "userX"
-	result := s.Start(user, test_session, "pulsar")
-	assert(result, notAuthorized(user), t)
+	username := "userX"
+	result := s.Start(username, test_session, "pulsar")
+	assert(result, user.NotAuthorized(username), t)
 }
 
 func TestStartBadConfig(t *testing.T) {
@@ -227,7 +229,7 @@ func TestResumeProper(t *testing.T) {
 	expected := "successfully resumed session " + test_session
 	assert(result, expected, t)
 	time.Sleep(time.Second)
-	if !s.sessions[0].isRunning {
+	if !s.sessions[0].IsRunning {
 		t.Fatal("expected session to be running, it isn't")
 	}
 }

@@ -4,102 +4,32 @@ import (
 	"LaaS/executor"
 	"LaaS/life"
 	"bufio"
-	"crypto/sha256"
 	"fmt"
 	"net"
+	"LaaS/server/session"
 	"strings"
-	"time"
+	"LaaS/server/user"
 )
 
 const connectionType = "tcp"
 const port = ":8088"
-const timeFormat = "Mon Jan 2 2006 15:04"
-
-type user struct {
-	name     string
-	password [sha256.Size]byte
-}
-
-func newUser(username, password string) *user {
-	passwordHash := sha256.Sum256([]byte(password))
-	return &user{name: username, password: passwordHash}
-}
-
-type session struct {
-	owner     *user
-	name      string
-	created   time.Time
-	currState *life.Life
-	stopper   chan string
-	isRunning bool
-}
-
-func NewSession(name string, owner *user) *session {
-	s := new(session)
-	s.name = name
-	s.created = time.Now()
-	s.owner = owner
-	return s
-}
 
 type Server struct {
-	sessions []*session
-	users    []user
+	sessions []*session.Session
+	users    []user.User
 }
 
 func NewServer() *Server {
 	s := new(Server)
-	s.sessions = []*session{}
+	s.sessions = []*session.Session{}
 	return s
-}
-
-func notAuthorized(name string) string {
-	return "user " + name + " not authorized"
-}
-
-func noSession(name string) string {
-	return "no session with the name " + name + " found"
 }
 
 func (s *Server) AssertExecutable() {}
 
-func (s *session) getStringRepresentation() string {
-	return "session " + s.name + ", created at " + s.created.Format(timeFormat)
-}
-
-func (s *session) run() {
-	go func() {
-		s.isRunning = true
-		s.stopper = make(chan string)
-		for {
-			select {
-			case <-s.stopper:
-				s.isRunning = false
-				close(s.stopper)
-				return
-			default:
-				time.Sleep(time.Second)
-				s.currState.NextGeneration()
-			}
-		}
-	}()
-}
-
-func (s *session) stop() {
-	s.stopper<- "stop"
-}
-
-func (s *session) String() string {
-	return fmt.Sprintf(s.getStringRepresentation())
-}
-
-func (s *session) authorize(user string) bool {
-	return s.owner.name == user
-}
-
 func (s *Server) sessionIndex(name string) int {
 	for idx, session := range s.sessions {
-		if session.name == name {
+		if session.Name == name {
 			return idx
 		}
 	}
@@ -108,7 +38,7 @@ func (s *Server) sessionIndex(name string) int {
 
 func (s *Server) userIndex(name string) int {
 	for idx, user := range s.users {
-		if user.name == name {
+		if user.Name == name {
 			return idx
 		}
 	}
@@ -119,7 +49,7 @@ func (s *Server) Register(username, password string) string {
 	if s.userIndex(username) != -1 {
 		return "user " + username + " already exists"
 	}
-	s.users = append(s.users, *newUser(username, password))
+	s.users = append(s.users, *user.NewUser(username, password))
 	return "registered user " + username
 }
 
@@ -129,7 +59,7 @@ func (s *Server) Login(username, password string) string {
 		return "user " + username + " does not exist"
 	}
 	user := s.users[index]
-	if user.password == sha256.Sum256([]byte(password)) {
+	if user.Authorize(password) {
 		return "user " + username + " logged in"
 	} else {
 		return "invalid password for " + username
@@ -141,21 +71,21 @@ func (s *Server) Add(username, name string) string {
 		return "session with the name " + name + " already exists"
 	}
 	owner := &s.users[s.userIndex(username)]
-	s.sessions = append(s.sessions, NewSession(name, owner))
+	s.sessions = append(s.sessions, session.NewSession(name, owner))
 	return "successfully created session " + name
 }
 
-func (s *Server) Kill(user, name string) string {
+func (s *Server) Kill(username, name string) string {
 	index := s.sessionIndex(name)
 	if index == -1 {
-		return noSession(name)
+		return session.NoSession(name)
 	}
 	current := s.sessions[index]
-	if !current.authorize(user) {
-		return notAuthorized(user)
+	if !current.Authorize(username) {
+		return user.NotAuthorized(username)
 	}
-	if current.isRunning {
-		current.stop()
+	if current.IsRunning {
+		current.Stop()
 	}
 	last := len(s.sessions) - 1
 	s.sessions[index] = s.sessions[last]
@@ -163,16 +93,16 @@ func (s *Server) Kill(user, name string) string {
 	return "session " + name + " successfully killed"
 }
 
-func (s *Server) Start(user, name, config string) string {
+func (s *Server) Start(username, name, config string) string {
 	index := s.sessionIndex(name)
 	if index == -1 {
-		return noSession(name)
+		return session.NoSession(name)
 	}
 	current := s.sessions[index]
-	if !current.authorize(user) {
-		return notAuthorized(user)
+	if !current.Authorize(username) {
+		return user.NotAuthorized(username)
 	}
-	if current.isRunning {
+	if current.IsRunning {
 		return "session " + name + " is already running"
 	}
 
@@ -181,57 +111,57 @@ func (s *Server) Start(user, name, config string) string {
 		return err.Error()
 	}
 
-	current.currState = newLife
-	current.run()
+	current.CurrState = newLife
+	current.Run()
 
 	return "successfully started session " + name
 }
 
-func (s *Server) Resume(user, name string) string {
+func (s *Server) Resume(username, name string) string {
 	index := s.sessionIndex(name)
 	if index == -1 {
-		return noSession(name)
+		return session.NoSession(name)
 	}
 	current := s.sessions[index]
-	if !current.authorize(user) {
-		return notAuthorized(user)
+	if !current.Authorize(username) {
+		return user.NotAuthorized(username)
 	}
-	if current.isRunning {
+	if current.IsRunning {
 		return "session " + name + " is already running"
 	}
-	current.run()
+	current.Run()
 
 	return "successfully resumed session " + name
 }
 
-func (s *Server) Stop(user, session string) string {
+func (s *Server) Stop(username, session string) string {
 	index := s.sessionIndex(session)
 	if index == -1 {
 		return "no session with the name " + session + " found"
 	}
 	current := s.sessions[index]
-	if !current.authorize(user) {
-		return notAuthorized(user)
+	if !current.Authorize(username) {
+		return user.NotAuthorized(username)
 	}
-	if !current.isRunning {
+	if !current.IsRunning {
 		return "session " + session + " is already stopped"
 	}
-	current.stop()
+	current.Stop()
 	return "session " + session + " successfully stopped"
 }
 
-func (s *Server) Watch(user, session string) string {
+func (s *Server) Watch(_, session string) string {
 	index := s.sessionIndex(session)
 	if index == -1 {
 		return "no session with the name " + session + " found"
 	}
-	return s.sessions[index].currState.Printable()
+	return s.sessions[index].CurrState.Printable()
 }
 
 func (s *Server) List() string {
 	var listing strings.Builder
 	for _, session := range s.sessions {
-		listing.WriteString(session.getStringRepresentation())
+		listing.WriteString(session.GetStringRepresentation())
 		listing.WriteString("\n")
 	}
 	listing.WriteString(fmt.Sprintf("\n%d total", len(s.sessions)))
