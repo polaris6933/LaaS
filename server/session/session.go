@@ -3,10 +3,10 @@
 package session
 
 import (
+	"LaaS/life"
+	"LaaS/server/user"
 	"fmt"
 	"time"
-	"LaaS/server/user"
-	"LaaS/life"
 )
 
 const timeFormat = "Mon Jan 2 2006 15:04"
@@ -59,7 +59,7 @@ func (s *Session) Run() {
 
 // Signals the session to stop executing the game.
 func (s *Session) Stop() {
-	s.stopper<- struct{}{}
+	s.stopper <- struct{}{}
 }
 
 // Implement the Stringer interface.

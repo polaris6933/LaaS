@@ -3,8 +3,8 @@ package life
 
 import (
 	"bufio"
-	"fmt"
 	"errors"
+	"fmt"
 	"os"
 	"path"
 	"strconv"
