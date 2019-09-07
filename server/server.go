@@ -188,12 +188,16 @@ func (s *Server) Stop(username, session string) string {
 
 // Returns the current state of the running game associated with the session
 // named `session`. Any user can watch any session.
-// Fails if a sessions with the name `name` does not exist
+// Fails if:
+//   - a sessions with the name `name` does not exist
+//   - the session had not been started
 func (s *Server) Watch(_, session string) string {
-	// TODO: init new sessions
 	index := s.sessionIndex(session)
 	if index == -1 {
 		return "no session with the name " + session + " found"
+	}
+	if s.sessions[index].CurrState == nil {
+		return "the session " + session + " has not been started"
 	}
 	return s.sessions[index].CurrState.Printable()
 }
