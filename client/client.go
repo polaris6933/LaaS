@@ -277,7 +277,7 @@ func main() {
 			return
 		}
 		execResult, err := executor.Execute(
-			client, strings.TrimSuffix(input, "\n"))
+			client, strings.TrimSpace(strings.TrimSuffix(input, "\n")))
 		if err != nil {
 			fmt.Println(err)
 			continue
