@@ -1,3 +1,5 @@
+// This package provides the entry point of the client application for LaaS
+// as well as the business logic of the client.
 package main
 
 import (
@@ -25,11 +27,18 @@ func clearScreen() {
 	cmd.Run()
 }
 
+// A client is described by its connection to the server and the name of
+// currently logged user. A default username is used to denote no one is
+// currently logged in.
+// The methods of `Client` return a user readable string describing the result
+// of the issued operation. It is either a response from the server or an error
+// raised by the client.
 type Client struct {
 	connection *net.Conn
 	loggedAs   string
 }
 
+// Constructs a new client.
 func NewClient() *Client {
 	c := new(Client)
 	c.connection = nil
@@ -37,6 +46,7 @@ func NewClient() *Client {
 	return c
 }
 
+// Implement the Executable interface.
 func (c Client) AssertExecutable() {}
 
 func (c *Client) attemptRecconect() {
@@ -77,6 +87,11 @@ func (c *Client) waitResponse() string {
 	return strings.TrimRight(response, "\000")
 }
 
+// Makes a request to the server attempting to register a user with the name
+// `username`.
+// Fails if:
+//   - `username` is the default user name
+//   - `username` is the empty string
 func (c *Client) Register(username string) string {
 	if username == defaultUserName {
 		return "user name " + defaultUserName + " not allowed"
@@ -91,6 +106,7 @@ func (c *Client) Register(username string) string {
 	return response
 }
 
+// Makes a request to the server attempting to log the user in.
 func (c *Client) Login(username string) string {
 	password := readPassword("input password: ")
 	response := c.makeRequest([]string{"login", username, password})
@@ -100,11 +116,13 @@ func (c *Client) Login(username string) string {
 	return response
 }
 
+// Logs the user out.
 func (c *Client) Logout() string {
 	c.loggedAs = defaultUserName
 	return "logged out"
 }
 
+// Attempts to establish a connection to the server.
 func (c *Client) Connect(connectTo string) string {
 	c.Disconnect()
 	conn, err := net.Dial(connectionType, connectTo)
@@ -116,6 +134,7 @@ func (c *Client) Connect(connectTo string) string {
 	return "connected to " + (*c.connection).RemoteAddr().String()
 }
 
+// Disconnects from the server.
 func (c *Client) Disconnect() string {
 	if c.connection == nil {
 		return ""
@@ -126,6 +145,7 @@ func (c *Client) Disconnect() string {
 	return "disconnected from " + address
 }
 
+// Makes a request to the server attempting to add a new session.
 func (c *Client) Add(name string) string {
 	if c.loggedAs == defaultUserName {
 		return "not logged in"
@@ -133,6 +153,9 @@ func (c *Client) Add(name string) string {
 	return c.makeRequest([]string{"add", c.loggedAs, name})
 }
 
+// Makes a request to the server attempting to start a session with the given
+// configuration.
+// Fails if the user is not logged in.
 func (c *Client) Start(name, config string) string {
 	if c.loggedAs == defaultUserName {
 		return "not logged in"
@@ -140,6 +163,8 @@ func (c *Client) Start(name, config string) string {
 	return c.makeRequest([]string{"start", c.loggedAs, name, config})
 }
 
+// Makes a request to the server attempting to resume a stopped session.
+// Fails if the user is not logged in.
 func (c *Client) Resume(name string) string {
 	if c.loggedAs == defaultUserName {
 		return "not logged in"
@@ -147,10 +172,13 @@ func (c *Client) Resume(name string) string {
 	return c.makeRequest([]string{"resume", c.loggedAs, name})
 }
 
+// Makes a request to the server attempting to list the session on the server.
 func (c *Client) List() string {
 	return c.makeRequest([]string{"list"})
 }
 
+// Makes a request to the server attempting to stop a session.
+// Fails if the user is not logged in.
 func (c *Client) Stop(name string) string {
 	if c.loggedAs == defaultUserName {
 		return "not logged in"
@@ -158,6 +186,8 @@ func (c *Client) Stop(name string) string {
 	return c.makeRequest([]string{"stop", c.loggedAs, name})
 }
 
+// Makes a request to the server attempting to delete a session.
+// Fails if the user is not logged in.
 func (c *Client) Kill(name string) string {
 	if c.loggedAs == defaultUserName {
 		return "not logged in"
@@ -181,6 +211,9 @@ func (c *Client) displayGame(s chan os.Signal, name string) {
 	}
 }
 
+// Makes a request to the server attempting to retrieve the current state of
+// the game associated with a session.
+// Fails if the user is not logged in.
 func (c *Client) Watch(name string) string {
 	if c.loggedAs == defaultUserName {
 		return "not logged in"
@@ -191,6 +224,7 @@ func (c *Client) Watch(name string) string {
 	return "game is now being displayed"
 }
 
+// Stops the application.
 func (c *Client) Exit() {
 	c.Disconnect()
 	os.Exit(0)

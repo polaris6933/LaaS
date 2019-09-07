@@ -22,6 +22,7 @@ type Executable interface {
 // An error is returned if:
 //   - `command` is not a method of the type of `anyType`
 //   - `command` does not contain enough arguments for the method it describes
+// NOTE: a method must be export for it to be executable.
 func Execute(anyType Executable, command string) ([]reflect.Value, error) {
 	commandSplit := strings.Split(command, " ")
 	commandName := commandSplit[0]
