@@ -1,3 +1,5 @@
+// Package main provides the entry point of the server part of LaaS and
+// contains most of the business logic of the application.
 package main
 
 import (
@@ -14,17 +16,23 @@ import (
 const connectionType = "tcp"
 const port = ":8088"
 
+// The Server is represented by a list of the users registered with the server
+// and the sessions which the users have added.
+// The Server methods return a human readable string which describes the result
+// of the issued request - no matter if the operation has succeeded or failed.
 type Server struct {
 	sessions []*session.Session
 	users    []user.User
 }
 
+// Constructs a Server.
 func NewServer() *Server {
 	s := new(Server)
 	s.sessions = []*session.Session{}
 	return s
 }
 
+// Implement the Executable interface for use with LaaS/executor.
 func (s *Server) AssertExecutable() {}
 
 func (s *Server) sessionIndex(name string) int {
@@ -45,6 +53,8 @@ func (s *Server) userIndex(name string) int {
 	return -1
 }
 
+// Registers a user with the server.
+// Fails if the username is already taken.
 func (s *Server) Register(username, password string) string {
 	if s.userIndex(username) != -1 {
 		return "user " + username + " already exists"
@@ -53,6 +63,10 @@ func (s *Server) Register(username, password string) string {
 	return "registered user " + username
 }
 
+// Logs the user in the server.
+// Fails if
+//   - a user with the name `username` does not exist
+//   - the password `password` does not match the password of the user
 func (s *Server) Login(username, password string) string {
 	index := s.userIndex(username)
 	if index == -1 {
@@ -66,6 +80,8 @@ func (s *Server) Login(username, password string) string {
 	}
 }
 
+// Creates a new session whose owner is the user issuing the request.
+// Fails if a sessions with the same name already exists.
 func (s *Server) Add(username, name string) string {
 	if s.sessionIndex(name) != -1 {
 		return "session with the name " + name + " already exists"
@@ -75,6 +91,10 @@ func (s *Server) Add(username, name string) string {
 	return "successfully created session " + name
 }
 
+// Permanently removes a session from the server.
+// Fails if
+//   - no session with the name `name` exists
+//   - the user issuing the request is not the owner of the session
 func (s *Server) Kill(username, name string) string {
 	index := s.sessionIndex(name)
 	if index == -1 {
@@ -93,6 +113,12 @@ func (s *Server) Kill(username, name string) string {
 	return "session " + name + " successfully killed"
 }
 
+// Loads a game configuration in the session named `name` and starts the game.
+// Fails if:
+//   - a sessions with the name `name` does not exist
+//   - the user issuing the request is not the owner of the session
+//   - the session has already been started
+//   - the config `config` does not exist
 func (s *Server) Start(username, name, config string) string {
 	index := s.sessionIndex(name)
 	if index == -1 {
@@ -117,6 +143,11 @@ func (s *Server) Start(username, name, config string) string {
 	return "successfully started session " + name
 }
 
+// Resumes a stopped session.
+// Fails if:
+//   - a sessions with the name `name` does not exist
+//   - the user issuing the request is not the owner of the session
+//   - the session is currently running
 func (s *Server) Resume(username, name string) string {
 	index := s.sessionIndex(name)
 	if index == -1 {
@@ -134,6 +165,11 @@ func (s *Server) Resume(username, name string) string {
 	return "successfully resumed session " + name
 }
 
+// Temporarily stops a running session.
+// Fails if:
+//   - a sessions with the name `name` does not exist
+//   - the user issuing the request is not the owner of the session
+//   - the session is not currently running
 func (s *Server) Stop(username, session string) string {
 	index := s.sessionIndex(session)
 	if index == -1 {
@@ -150,7 +186,11 @@ func (s *Server) Stop(username, session string) string {
 	return "session " + session + " successfully stopped"
 }
 
+// Returns the current state of the running game associated with the session
+// named `session`. Any user can watch any session.
+// Fails if a sessions with the name `name` does not exist
 func (s *Server) Watch(_, session string) string {
+	// TODO: init new sessions
 	index := s.sessionIndex(session)
 	if index == -1 {
 		return "no session with the name " + session + " found"
@@ -158,6 +198,7 @@ func (s *Server) Watch(_, session string) string {
 	return s.sessions[index].CurrState.Printable()
 }
 
+// Returns information for all the sessions on the server.
 func (s *Server) List() string {
 	var listing strings.Builder
 	for _, session := range s.sessions {
