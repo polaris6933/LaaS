@@ -14,8 +14,7 @@ type Session struct {
 	Name      string
 	created   time.Time
 	CurrState *life.Life
-	// TODO: use struct{}
-	stopper   chan string
+	stopper   chan struct{}
 	IsRunning bool
 }
 
@@ -34,7 +33,7 @@ func (s *Session) GetStringRepresentation() string {
 func (s *Session) Run() {
 	go func() {
 		s.IsRunning = true
-		s.stopper = make(chan string)
+		s.stopper = make(chan struct{})
 		for {
 			select {
 			case <-s.stopper:
@@ -50,7 +49,7 @@ func (s *Session) Run() {
 }
 
 func (s *Session) Stop() {
-	s.stopper<- "stop"
+	s.stopper<- struct{}{}
 }
 
 func (s *Session) String() string {
